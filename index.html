@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light dark; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font: 14px/1.5 system-ui, -apple-system, sans-serif; background: #f6f7f9; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<title>Trilha AI Engineer 2026</title>
+<meta name="description" content="Acompanhamento pessoal de progresso pelo roadmap de AI Engineer, com estado salvo no navegador.">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #eef1f4;
+    --border: #e0e3e8;
+    --ink: #1b1e26;
+    --muted: #626977;
+    --accent: #2f5fc0;
+    --done: #2f8f6f;
+    --doing: #b0751a;
+    --shadow: 0 1px 2px rgba(20, 24, 34, .06), 0 8px 24px rgba(20, 24, 34, .05);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131519;
+      --surface: #1b1e24;
+      --surface-2: #23272f;
+      --border: #2d323c;
+      --ink: #e4e7ec;
+      --muted: #8b93a1;
+      --accent: #6f9bec;
+      --done: #4bb890;
+      --doing: #d69a3f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131519;
+    --surface: #1b1e24;
+    --surface-2: #23272f;
+    --border: #2d323c;
+    --ink: #e4e7ec;
+    --muted: #8b93a1;
+    --accent: #6f9bec;
+    --done: #4bb890;
+    --doing: #d69a3f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .28);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 14px 22px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "title actions" "bar bar";
+    gap: 10px 18px;
+    align-items: center;
+  }
+  .titleblock { grid-area: title; }
+  h1 {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .titleblock p {
+    margin: 2px 0 0;
+    font-size: .78rem;
+    color: var(--muted);
+  }
+  .topbar-actions { grid-area: actions; display: flex; gap: 8px; }
+  .overall { grid-area: bar; display: flex; align-items: center; gap: 14px; }
+  .overall .figures {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .overall .pct {
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
+  }
+  .overall .frac {
+    font-size: .76rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .track {
+    flex: 1;
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .track .fill {
+    height: 100%;
+    width: 0;
+    background: var(--done);
+    border-radius: 999px;
+    transition: width .35s ease;
+  }
+  .track .fill.partial {
+    background: repeating-linear-gradient(
+      90deg, var(--done) 0 6px, color-mix(in srgb, var(--done) 55%, var(--surface)) 6px 12px);
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 5px 11px;
+    font-size: .78rem;
+    font-weight: 500;
+    transition: border-color .15s, background .15s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- layout ---------- */
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 26px 22px 80px;
+  }
+  .lede {
+    font-size: .86rem;
+    color: var(--muted);
+    border-left: 2px solid var(--border);
+    padding-left: 14px;
+    margin: 0 0 26px;
+  }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- backup banner + panel ---------- */
+  .banner {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: color-mix(in srgb, var(--doing) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--doing) 35%, var(--border));
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: .82rem;
+    margin-bottom: 20px;
+  }
+  .banner p { margin: 0; flex: 1; }
+  .banner .dismiss {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 2px 6px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px;
+    margin-bottom: 24px;
+  }
+  .panel h2 { margin: 0 0 4px; font-size: .95rem; }
+  .panel p { margin: 0 0 12px; font-size: .8rem; color: var(--muted); }
+  .panel textarea {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .74rem;
+    line-height: 1.5;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .panel .panel-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .panel .msg { font-size: .76rem; margin-top: 8px; min-height: 1.2em; }
+  .panel .msg.ok { color: var(--done); }
+  .panel .msg.err { color: #c0392b; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .panel .msg.err { color: #e88a80; }
+  }
+  :root[data-theme="dark"] .panel .msg.err { color: #e88a80; }
+
+  /* ---------- phases ---------- */
+  .phase {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .phase-head {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 13px 16px;
+    text-align: left;
+  }
+  .phase-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .chev {
+    color: var(--muted);
+    font-size: .7rem;
+    transition: transform .18s ease;
+  }
+  .phase[data-open="true"] .chev { transform: rotate(90deg); }
+  .phase-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+  }
+  .phase-name { font-weight: 600; font-size: .92rem; letter-spacing: -.005em; }
+  .phase-name .done-check { color: var(--done); margin-left: 6px; }
+  .phase-weeks {
+    font-size: .72rem;
+    color: var(--muted);
+  }
+  .tag {
+    font-size: .64rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 2px 6px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .phase-mini {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 116px;
+  }
+  .phase-mini .mini-frac {
+    font-size: .72rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .mini-track {
+    width: 62px;
+    height: 5px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .mini-track .mini-fill {
+    height: 100%;
+    width: 0;
+    background: var(--done);
+    transition: width .3s ease;
+  }
+
+  .items {
+    list-style: none;
+    margin: 0;
+    padding: 0 16px 8px;
+  }
+  .phase[data-open="false"] .items { display: none; }
+
+  .group {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    font-weight: 700;
+    color: var(--muted);
+    padding: 16px 0 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+
+  .item {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 12px;
+    padding: 9px 0;
+    align-items: start;
+    border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  }
+  .item:first-child { border-top: 0; }
+  .group + .item { border-top: 0; }
+
+  .toggle {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    flex-shrink: 0;
+    transition: border-color .15s, background .15s;
+  }
+  .toggle:hover { border-color: var(--accent); }
+  .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .toggle::after { content: ""; }
+  .item[data-state="in_progress"] .toggle {
+    border-color: var(--doing);
+  }
+  .item[data-state="in_progress"] .toggle::after {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--doing);
+  }
+  .item[data-state="done"] .toggle {
+    border-color: var(--done);
+    background: var(--done);
+  }
+  .item[data-state="done"] .toggle::after {
+    content: "✓";
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .item[data-state="done"] .toggle::after { color: #0e1512; }
+  }
+  :root[data-theme="dark"] .item[data-state="done"] .toggle::after { color: #0e1512; }
+
+  .item-body { min-width: 0; }
+  .item-text {
+    font-size: .875rem;
+    transition: color .15s;
+  }
+  .item[data-state="done"] .item-text {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+  }
+  .item--project .item-text::before {
+    content: "Projeto";
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-right: 7px;
+    vertical-align: 1px;
+    white-space: nowrap;
+  }
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .badge {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .66rem;
+    color: var(--muted);
+    background: var(--surface-2);
+    border-radius: 5px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+
+  .static {
+    margin-top: 30px;
+    padding: 20px 22px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    font-size: .84rem;
+    color: var(--muted);
+  }
+  .static h2 { color: var(--ink); font-size: .9rem; margin: 0 0 8px; }
+  .static h2:not(:first-child) { margin-top: 18px; }
+  .static ol, .static ul { margin: 0; padding-left: 20px; }
+  .static li { margin: 3px 0; }
+  .static strong { color: var(--ink); }
+
+  footer.savebar {
+    max-width: 860px;
+    margin: 22px auto 0;
+    padding: 0 22px;
+    font-size: .74rem;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    align-items: center;
+  }
+  footer.savebar .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--done);
+    display: inline-block;
+  }
+  footer.savebar button {
+    border: 0; background: transparent; color: var(--accent);
+    padding: 0; font-size: inherit; text-decoration: underline;
+  }
+
+  @media (max-width: 620px) {
+    .topbar-inner { grid-template-columns: 1fr; grid-template-areas: "title" "actions" "bar"; }
+    .topbar-actions { justify-self: start; }
+    .phase-head { grid-template-columns: 18px 1fr; }
+    .phase-mini { grid-column: 1 / -1; padding-left: 30px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="titleblock">
+      <h1>Trilha AI Engineer 2026</h1>
+      <p>Progresso salvo neste navegador &middot; baseado em <span class="mono">roadmap.md</span></p>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" id="btn-expand">Expandir tudo</button>
+      <button class="btn" id="btn-backup">Backup</button>
+    </div>
+    <div class="overall">
+      <div class="figures">
+        <span class="pct" id="overall-pct">0%</span>
+        <span class="frac" id="overall-frac">0 / 0</span>
+      </div>
+      <div class="track"><div class="fill" id="overall-fill"></div></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <p class="lede">
+    Cada bullet do roadmap &eacute; um item. Clique no marcador para alternar
+    <strong>n&atilde;o come&ccedil;ado &rarr; em andamento &rarr; conclu&iacute;do</strong>.
+    O percentual geral considera as <strong>fases 0 a 7</strong> (n&uacute;cleo); as fases 8 e 9
+    s&atilde;o opcionais e t&ecirc;m barra pr&oacute;pria. &ldquo;Em andamento&rdquo; vale meio ponto.
+  </p>
+
+  <div class="banner" id="backup-banner" hidden>
+    <p id="backup-banner-text"></p>
+    <button class="dismiss" id="backup-banner-dismiss" aria-label="Dispensar aviso">&times;</button>
+  </div>
+
+  <div class="panel" id="backup-panel" hidden>
+    <h2>Backup do progresso</h2>
+    <p>
+      O progresso j&aacute; fica salvo neste navegador automaticamente. Use isto s&oacute; para
+      levar o progresso a outro navegador/m&aacute;quina ou guardar uma c&oacute;pia.
+    </p>
+    <textarea id="backup-text" spellcheck="false" aria-label="JSON do progresso"></textarea>
+    <div class="panel-row">
+      <button class="btn" id="btn-copy">Copiar JSON atual</button>
+      <button class="btn" id="btn-import">Importar do campo acima</button>
+      <button class="btn" id="btn-close-panel">Fechar</button>
+    </div>
+    <div class="msg" id="backup-msg" role="status"></div>
+  </div>
+
+  <div id="phases"></div>
+
+  <section class="static">
+    <h2>Portf&oacute;lio final sugerido (3-4 projetos, n&atilde;o tutoriais)</h2>
+    <ol>
+      <li>RAG chatbot sobre documentos pr&oacute;prios, com avalia&ccedil;&atilde;o automatizada (Graph RAG com Neo4j como diferencial).</li>
+      <li>Servidor MCP do zero + agente que consome ele para executar uma a&ccedil;&atilde;o real.</li>
+      <li>Vers&atilde;o em produ&ccedil;&atilde;o de um dos dois acima: cache, observability, guardrails, deploy (Docker/K8s).</li>
+      <li>(Opcional) Algo multimodal ou uma vertical (DevOps/UX) se o nicho pedir.</li>
+    </ol>
+    <h2>Notas finais</h2>
+    <ul>
+      <li>N&atilde;o siga como checklist r&iacute;gido &mdash; pule o que j&aacute; domina, aprofunde onde o objetivo pede.</li>
+      <li>O curso da UNIPDS cobre &mdash; e em pontos ultrapassa &mdash; este roadmap, sobretudo em MCP e DevOps assistido por IA.</li>
+      <li>Projetos &gt; certificados.</li>
+      <li>A &aacute;rea muda r&aacute;pido: a estrutura de conhecimento importa mais que os nomes de ferramentas.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="savebar">
+  <span><span class="dot"></span> <span id="save-status">salvo localmente</span></span>
+  <span id="last-change" title=""></span>
+  <button id="btn-reset">zerar progresso</button>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "roadmap-ai-2026-progress";
+  var STATES = ["not_started", "in_progress", "done"];
+  var STATE_LABEL = {
+    not_started: "Não começado",
+    in_progress: "Em andamento",
+    done: "Concluído"
+  };
+
+  // ---------- roadmap data ----------
+  var DATA = [
+    { id: "f0", name: "Fase 0 · Pré-requisitos", weeks: "1–2 semanas", items: [
+      { t: "Async em TS: Promises, async/await, streaming (SSE) — SDKs de LLM usam muito stream de tokens" },
+      { t: "APIs REST: retry, tratamento de erro, rate limit" },
+      { t: "Git / GitHub" },
+      { t: "Matemática mínima: vetores / produto escalar (embeddings), noções de probabilidade" }
+    ]},
+    { id: "f1", name: "Fase 1 · Fundamentos de ML/LLM", weeks: "2–3 semanas", items: [
+      { t: "O que são LLMs, como funciona inferência" },
+      { t: "Redes neurais — conceito, criação e treinamento básico", b: ["curso 02 — Mód. 02"] },
+      { t: "Transformers, embeddings, attention", b: ["curso 02 — Mód. 05"] },
+      { t: "Algoritmos genéticos — contexto histórico / intuição, não é core do dia a dia", b: ["curso 02 — Mód. 05"] },
+      { t: "Sistemas de recomendação (série em 7 partes)", b: ["curso 02 — Mód. 03"] },
+      { t: "Algoritmos de decisão / jogos", b: ["curso 02 — Mód. 04"] },
+      { t: "Tokens: contagem, limites de contexto, custo por token" },
+      { t: "Chamando APIs de modelos: SDKs oficiais TS (OpenAI, Anthropic, Google)" },
+      { t: "Vercel AI SDK: abstrai múltiplos providers com uma interface só" },
+      { t: "Modelos abertos vs. fechados; Ollama (local); OpenRouter (orquestração multi-modelo)", b: ["curso 02 — Mód. 09", "curso 03 — Mód. 01"] },
+      { t: "Script que chama 2+ providers e compara respostas", project: true }
+    ]},
+    { id: "f2", name: "Fase 2 · Prompt Engineering", weeks: "1–2 semanas", items: [
+      { t: "Zero-shot, few-shot, chain-of-thought" },
+      { t: "System vs user prompts, output estruturado (JSON)", b: ["curso 02 — Mód. 06"] },
+      { t: "Padrão TOON para prompts — não é mainstream fora do curso, mas vale conhecer", b: ["curso 02 — Mód. 06"] },
+      { t: "Técnicas de redução de alucinação" },
+      { t: "Biblioteca de prompts reutilizáveis para uma tarefa específica", project: true }
+    ]},
+    { id: "f3", name: "Fase 3 · Embeddings e Vector Databases", weeks: "2 semanas", items: [
+      { t: "O que são embeddings, casos de uso (busca semântica, recomendação, anomalia)" },
+      { t: "Vector DBs: Chroma, Qdrant, Pinecone" },
+      { t: "Graph DB como alternativa / complemento: Neo4j (query planner, geração de Cypher)", b: ["curso 02 — Mód. 10", "curso 03 — Mód. 06"] },
+      { t: "Indexação, similaridade, hybrid search" },
+      { t: "Busca semântica sobre documentos próprios", project: true }
+    ]},
+    { id: "f4", name: "Fase 4 · RAG", weeks: "3–4 semanas", items: [
+      { t: "RAG vs fine-tuning" },
+      { t: "Chunking (fixed, semântico, recursivo)" },
+      { t: "Pipeline: ingestão → chunking → embedding → storage → retrieval → geração" },
+      { t: "Técnicas avançadas: query rewriting, re-ranking, Agentic RAG" },
+      { t: "Graph RAG com Neo4j (projeto prático RAG + JS + Neo4j)", b: ["curso 02 — Mód. 10"] },
+      { t: "Frameworks: LangChain.js, LlamaIndex.TS", b: ["curso 03 — Mód. 02"] },
+      { t: "LangGraph: estados, studio, exposição como Web API, fluxos condicionais, nodes de fallback", b: ["curso 03 — Mód. 02"] },
+      { t: "Marcação de consultas médicas — intenção do usuário, JSON estruturado, testes E2E, cancelamento via texto livre", b: ["curso 03 — Mód. 03"], project: true },
+      { t: "Recomendador de músicas — extração de preferência, memória com SQLite, persistência com Postgres", b: ["curso 03 — Mód. 04"], project: true },
+      { t: "Chatbot sobre documentos próprios (PDF / site)", project: true }
+    ]},
+    { id: "f5", name: "Fase 5 · Agentes e MCP", weeks: "6–8 semanas", items: [
+      { group: "Fundamentos de agentes" },
+      { t: "O que é um agente: LLM que raciocína, planeja, usa ferramentas, age em loop" },
+      { t: "Cursor / VSCode / Windsurf como referência de agente em produto real", b: ["curso 02 — Mód. 07"] },
+      { t: "Agentes de IA e tomada de decisão em etapas", b: ["curso 02 — Mód. 07"] },
+      { t: "Implementação manual do loop primeiro — antes de framework, pra não depender de mágica" },
+      { t: "Padrões: ReAct, Planner-Executor" },
+      { t: "Arquitetura de agente: agent loop, contratos, runtime, observabilidade, tipos de agente", b: ["curso 05 — Mód. 01"] },
+      { t: "Arquiteturas cognitivas: plan-execute-reflection", b: ["curso 05 — Mód. 02"] },
+      { t: "Do mock pro real: integração com banco de dados e MCP", b: ["curso 05 — Mód. 03"] },
+      { group: "MCP (Model Context Protocol)" },
+      { t: "Diferença entre MCP e modelo clássico de tools / plugins", b: ["curso 04 — Mód. 01"] },
+      { t: "Introdução prática a MCPs: gerar testes, navegar sites, consultar docs, telemetria", b: ["curso 02 — Mód. 08"] },
+      { t: "Criando um MCP do zero: tools, testes via client, inspeção de servidor, resources e prompts", b: ["curso 04 — Mód. 04"] },
+      { t: "Orquestração autônoma via LangChain.js + MCP (MongoDB, filesystem, tool customizada, API externa)", b: ["curso 04 — Mód. 02"] },
+      { t: "Agents, Instructions e Skills", b: ["curso 04 — Mód. 03"] },
+      { t: "Gestão de clientes: CRUD via MCP conectando a sistema legado", b: ["curso 04 — Mód. 05"], project: true },
+      { t: "Auth em MCP: RBAC, JWT, service tokens, rate limiting", b: ["curso 04 — Mód. 06"] },
+      { t: "Publicação de servidor MCP (NPM público, Verdaccio privado), diferentes transports", b: ["curso 04 — Mód. 07"] },
+      { t: "Agente de operações de clientes com Customers MCP Server", b: ["curso 04 — Mód. 08"], project: true },
+      { t: "SDK oficial de MCP em TypeScript" },
+      { group: "Memória e multi-agente" },
+      { t: "Memória de agente: curto prazo (contexto), longo prazo (vector store), reflexão evolutiva", b: ["curso 05 — Mód. 04"] },
+      { t: "Multi-agente: quando dividir responsabilidade entre agentes", b: ["curso 09 — Mód. 03"] },
+      { t: "Framework de orquestração: LangGraph.js, ou Claude Agent SDK / OpenAI Agents SDK" },
+      { t: "Segurança contra prompt injection, safeguards, MCP adapters, prompt templates", b: ["curso 03 — Mód. 05"] },
+      { t: "Agente que executa ação real (agenda, cria issue, manda email) — peça de portfólio", b: ["curso 05 — Mód. 01"], project: true }
+    ]},
+    { id: "f6", name: "Fase 6 · Avaliação e Observabilidade", weeks: "3–4 semanas", items: [
+      { t: "Dataset de teste representativo antes de shippar" },
+      { t: "Definir bom: correção, fidelidade à fonte, tom, latência" },
+      { t: "LLM-as-judge e seus vieses" },
+      { t: "Testes unitários por tool, testes de integração no fluxo completo" },
+      { t: "Observabilidade com Langfuse + evaluation tests", b: ["curso 03 — Mód. 07"] },
+      { t: "Evals de seleção de tools — o agente escolheu a ferramenta certa?", b: ["curso 05 — Mód. 03"] },
+      { t: "Evals de memória — o agente lembrou / esqueceu corretamente?", b: ["curso 05 — Mód. 04"] },
+      { t: "Frameworks de evaluation de mercado (visão geral)", b: ["curso 05 — Mód. 02"] },
+      { t: "Ferramentas fora do curso: Promptfoo, LangSmith" },
+      { t: "Human-in-the-loop evaluation" },
+      { t: "Suite de avaliação automatizada para o RAG / agente já construído", project: true }
+    ]},
+    { id: "f7", name: "Fase 7 · Produção e Segurança", weeks: "4–5 semanas", items: [
+      { t: "Servir API: Express, Fastify, Hono, Next.js API routes" },
+      { t: "Cache (Redis), rate limiting, retry / circuit breaker" },
+      { t: "Guardrails: validação de input / output, moderation API" },
+      { t: "Segurança contra prompt injection na prática", b: ["curso 03 — Mód. 05"] },
+      { t: "RBAC, JWT, service tokens, rate limiting em contexto de MCP", b: ["curso 04 — Mód. 06"] },
+      { t: "Conteinerização: Docker como artefato de IA imutável", b: ["curso 07 — Mód. 13"] },
+      { t: "Kubernetes local (Minikube), LocalStack, dashboards com Streamlit, IA offline com Ollama em K8s", b: ["curso 07 — Mód. 13"] },
+      { t: "DevOps assistido por IA: automação → inteligência agêntica, self-healing, SRE assistido, MTTR, observabilidade preditiva, FinOps", b: ["curso 07 — Mód. 01–12"] },
+      { t: "Agente da Fase 5 em produção, com cache, logging e guardrails", project: true }
+    ]},
+    { id: "f8", name: "Fase 8 · Multimodal", weeks: "1–2 semanas", optional: true, items: [
+      { t: "Vision, geração de imagem, áudio (TTS / STT)", b: ["curso 03 — Mód. 07"] },
+      { t: "Priorize só se o nicho pedir (produto com imagem / voz)" }
+    ]},
+    { id: "f9", name: "Fase 9 · Aplicações verticais de IA", weeks: "opcional", optional: true, items: [
+      { t: "IA para UX/UI: structured prompts, Angular + MCP, componente acessível via Figma/Stitch, Nx + spec-driven, QA com Cypress/Playwright MCP, Genkit", b: ["curso 06"] },
+      { t: "IA para Gestão de Projetos: priorização de backlog, estimativas, riscos, status reports, governança e portfólio", b: ["curso 08"] },
+      { t: "Arquitetura de Sistemas com IA: fundamentos AI-first, single vs multi-agent, padrões de design AI-específicos, enterprise", b: ["curso 09"] }
+    ]}
+  ];
+
+  // assign stable ids to trackable items
+  DATA.forEach(function (phase) {
+    var n = 0;
+    phase.trackable = [];
+    phase.items.forEach(function (it) {
+      if (it.group) return;
+      n += 1;
+      it.id = phase.id + "-" + n;
+      phase.trackable.push(it);
+    });
+  });
+
+  // ---------- storage ----------
+  var storageOK = true;
+  function nowISO() { return new Date().toISOString(); }
+
+  function defaultState() {
+    return { version: 1, items: {}, firstChangeAt: null, lastChangeAt: null, lastExportAt: null, ui: { collapsed: {}, bannerDismissed: false } };
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      var s = defaultState();
+      if (parsed && typeof parsed === "object") {
+        if (parsed.items && typeof parsed.items === "object") s.items = parsed.items;
+        s.firstChangeAt = parsed.firstChangeAt || null;
+        s.lastChangeAt = parsed.lastChangeAt || null;
+        s.lastExportAt = parsed.lastExportAt || null;
+        if (parsed.ui && typeof parsed.ui === "object") {
+          s.ui.collapsed = parsed.ui.collapsed || {};
+          s.ui.bannerDismissed = !!parsed.ui.bannerDismissed;
+        }
+      }
+      return s;
+    } catch (e) {
+      storageOK = false;
+      return defaultState();
+    }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      storageOK = false;
+      updateSaveStatus();
+    }
+  }
+
+  var state = loadState();
+
+  // ---------- progress math ----------
+  function pointsFor(st) { return st === "done" ? 1 : st === "in_progress" ? 0.5 : 0; }
+
+  function phaseProgress(phase) {
+    var total = phase.trackable.length;
+    var pts = 0, doneCount = 0;
+    phase.trackable.forEach(function (it) {
+      var st = state.items[it.id] || "not_started";
+      pts += pointsFor(st);
+      if (st === "done") doneCount += 1;
+    });
+    return { total: total, points: pts, doneCount: doneCount, pct: total ? Math.round((pts / total) * 100) : 0 };
+  }
+
+  function fmtNum(n) {
+    return Number.isInteger(n) ? String(n) : n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  }
+
+  // ---------- rendering ----------
+  var phasesEl = document.getElementById("phases");
+
+  function buildPhase(phase) {
+    var sec = document.createElement("section");
+    sec.className = "phase";
+    sec.dataset.phase = phase.id;
+    var collapsed = !!state.ui.collapsed[phase.id];
+    sec.dataset.open = collapsed ? "false" : "true";
+
+    var head = document.createElement("button");
+    head.className = "phase-head";
+    head.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    head.innerHTML =
+      '<span class="chev" aria-hidden="true">▸</span>' +
+      '<span class="phase-label">' +
+        '<span class="phase-name">' + escapeHTML(phase.name) + '</span>' +
+        '<span class="phase-weeks">' + escapeHTML(phase.weeks) + '</span>' +
+        (phase.optional ? '<span class="tag">opcional</span>' : '') +
+      '</span>' +
+      '<span class="phase-mini">' +
+        '<span class="mini-frac"></span>' +
+        '<span class="mini-track"><span class="mini-fill"></span></span>' +
+      '</span>';
+    head.addEventListener("click", function () {
+      var open = sec.dataset.open === "true";
+      sec.dataset.open = open ? "false" : "true";
+      head.setAttribute("aria-expanded", open ? "false" : "true");
+      state.ui.collapsed[phase.id] = open;
+      saveState();
+    });
+
+    var ol = document.createElement("ol");
+    ol.className = "items";
+
+    phase.items.forEach(function (it) {
+      if (it.group) {
+        var g = document.createElement("li");
+        g.className = "group";
+        g.textContent = it.group;
+        ol.appendChild(g);
+        return;
+      }
+      var li = document.createElement("li");
+      li.className = "item" + (it.project ? " item--project" : "");
+      li.dataset.id = it.id;
+      li.dataset.state = state.items[it.id] || "not_started";
+
+      var btn = document.createElement("button");
+      btn.className = "toggle";
+      btn.type = "button";
+      setToggleLabel(btn, li.dataset.state);
+      btn.addEventListener("click", function () { cycle(it.id); });
+
+      var body = document.createElement("div");
+      body.className = "item-body";
+      var txt = document.createElement("div");
+      txt.className = "item-text";
+      txt.textContent = it.t;
+      body.appendChild(txt);
+      if (it.b && it.b.length) {
+        var badges = document.createElement("div");
+        badges.className = "badges";
+        it.b.forEach(function (bt) {
+          var s = document.createElement("span");
+          s.className = "badge";
+          s.textContent = bt;
+          badges.appendChild(s);
+        });
+        body.appendChild(badges);
+      }
+
+      li.appendChild(btn);
+      li.appendChild(body);
+      ol.appendChild(li);
+    });
+
+    sec.appendChild(head);
+    sec.appendChild(ol);
+    phasesEl.appendChild(sec);
+  }
+
+  function setToggleLabel(btn, st) {
+    btn.setAttribute("aria-label", STATE_LABEL[st] + " — clique para alternar");
+    btn.title = STATE_LABEL[st];
+  }
+
+  function escapeHTML(s) {
+    return s.replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  DATA.forEach(buildPhase);
+
+  // ---------- state changes ----------
+  function cycle(id) {
+    var cur = state.items[id] || "not_started";
+    var next = STATES[(STATES.indexOf(cur) + 1) % STATES.length];
+    if (next === "not_started") delete state.items[id];
+    else state.items[id] = next;
+    state.lastChangeAt = nowISO();
+    if (!state.firstChangeAt && Object.keys(state.items).length > 0) state.firstChangeAt = state.lastChangeAt;
+    saveState();
+
+    var li = phasesEl.querySelector('.item[data-id="' + id + '"]');
+    if (li) {
+      li.dataset.state = next;
+      setToggleLabel(li.querySelector(".toggle"), next);
+    }
+    refreshProgress();
+    updateSaveStatus();
+    updateBanner();
+  }
+
+  function refreshProgress() {
+    var coreTotal = 0, corePts = 0;
+    DATA.forEach(function (phase) {
+      var p = phaseProgress(phase);
+      var sec = phasesEl.querySelector('.phase[data-phase="' + phase.id + '"]');
+      sec.querySelector(".mini-frac").textContent = p.doneCount + "/" + p.total;
+      sec.querySelector(".mini-fill").style.width = p.pct + "%";
+      var nameEl = sec.querySelector(".phase-name");
+      var existing = nameEl.querySelector(".done-check");
+      if (p.doneCount === p.total && p.total > 0) {
+        if (!existing) {
+          var c = document.createElement("span");
+          c.className = "done-check";
+          c.textContent = "✓";
+          c.setAttribute("aria-hidden", "true");
+          nameEl.appendChild(c);
+        }
+      } else if (existing) {
+        existing.remove();
+      }
+      if (!phase.optional) { coreTotal += p.total; corePts += p.points; }
+    });
+
+    var pct = coreTotal ? Math.round((corePts / coreTotal) * 100) : 0;
+    document.getElementById("overall-pct").textContent = pct + "%";
+    document.getElementById("overall-frac").textContent = fmtNum(corePts) + " / " + coreTotal;
+    var fill = document.getElementById("overall-fill");
+    fill.style.width = pct + "%";
+    fill.classList.toggle("partial", corePts % 1 !== 0);
+  }
+
+  // ---------- relative time ----------
+  function relTime(iso) {
+    if (!iso) return null;
+    var then = new Date(iso).getTime();
+    if (isNaN(then)) return null;
+    var diff = Date.now() - then;
+    var min = 60000, hour = 60 * min, day = 24 * hour, week = 7 * day, month = 30 * day, year = 365 * day;
+    if (diff < min) return "agora mesmo";
+    if (diff < hour) return "há " + Math.floor(diff / min) + " min";
+    if (diff < day) return "há " + Math.floor(diff / hour) + " h";
+    if (diff < 2 * day) return "ontem";
+    if (diff < week) return "há " + Math.floor(diff / day) + " dias";
+    if (diff < 5 * week) return "há " + Math.floor(diff / week) + " semana" + (Math.floor(diff / week) > 1 ? "s" : "");
+    if (diff < 12 * month) return "há " + Math.floor(diff / month) + " meses";
+    return "há mais de um ano";
+  }
+
+  function absTime(iso) {
+    try { return new Date(iso).toLocaleString("pt-BR"); } catch (e) { return ""; }
+  }
+
+  function updateSaveStatus() {
+    var st = document.getElementById("save-status");
+    var lc = document.getElementById("last-change");
+    if (!storageOK) {
+      st.textContent = "não foi possível salvar neste navegador (modo restrito)";
+      lc.textContent = "";
+      document.querySelector("footer.savebar .dot").style.background = "var(--doing)";
+      return;
+    }
+    st.textContent = "salvo localmente";
+    var rel = relTime(state.lastChangeAt);
+    if (rel) {
+      lc.textContent = "· última alteração " + rel;
+      lc.title = absTime(state.lastChangeAt);
+    } else {
+      lc.textContent = "· nenhuma alteração ainda";
+      lc.title = "";
+    }
+  }
+
+  // ---------- backup banner ----------
+  var WEEK_MS = 7 * 24 * 3600 * 1000;
+
+  function updateBanner() {
+    var banner = document.getElementById("backup-banner");
+    var textEl = document.getElementById("backup-banner-text");
+    if (!banner || !textEl) return;
+
+    var ms = function (iso) { var t = iso ? new Date(iso).getTime() : NaN; return isNaN(t) ? null : t; };
+    var exported = ms(state.lastExportAt);
+    var changed = ms(state.lastChangeAt);
+    var first = ms(state.firstChangeAt) || changed;
+
+    // reference point: last backup, or (never backed up) the first change ever
+    var ref = exported != null ? exported : first;
+    var hasUnsavedChange = changed != null && (exported == null || changed > exported);
+
+    var show = !state.ui.bannerDismissed
+      && hasUnsavedChange
+      && ref != null
+      && (Date.now() - ref > WEEK_MS);
+
+    banner.hidden = !show;
+    if (!show) return;
+
+    var since = exported != null
+      ? "seu último backup foi " + (relTime(state.lastExportAt) || "há bastante tempo")
+      : "você ainda não fez nenhum backup";
+    textEl.textContent = "Faz um tempo — " + since + ". Vale copiar o JSON do progresso em Backup.";
+  }
+
+  document.getElementById("backup-banner-dismiss").addEventListener("click", function () {
+    state.ui.bannerDismissed = true;
+    saveState();
+    document.getElementById("backup-banner").hidden = true;
+  });
+
+  // ---------- backup panel ----------
+  var panel = document.getElementById("backup-panel");
+  var backupText = document.getElementById("backup-text");
+  var backupMsg = document.getElementById("backup-msg");
+
+  function exportPayload() {
+    return JSON.stringify({
+      version: 1,
+      items: state.items,
+      firstChangeAt: state.firstChangeAt,
+      lastChangeAt: state.lastChangeAt,
+      lastExportAt: state.lastExportAt
+    }, null, 2);
+  }
+
+  function setMsg(text, kind) {
+    backupMsg.textContent = text;
+    backupMsg.className = "msg" + (kind ? " " + kind : "");
+  }
+
+  document.getElementById("btn-backup").addEventListener("click", function () {
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) {
+      backupText.value = exportPayload();
+      setMsg("", "");
+      backupText.focus();
+      backupText.setSelectionRange(0, 0);
+    }
+  });
+  document.getElementById("btn-close-panel").addEventListener("click", function () { panel.hidden = true; });
+
+  document.getElementById("btn-copy").addEventListener("click", function () {
+    backupText.value = exportPayload();
+    backupText.select();
+    var done = false;
+    try { done = document.execCommand("copy"); } catch (e) { done = false; }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(backupText.value).then(function () {
+        markExported(); setMsg("JSON copiado para a área de transferência.", "ok");
+      }, function () {
+        if (done) { markExported(); setMsg("JSON copiado.", "ok"); }
+        else setMsg("Não consegui copiar automaticamente — selecione o texto e copie à mão.", "err");
+      });
+    } else if (done) {
+      markExported(); setMsg("JSON copiado.", "ok");
+    } else {
+      setMsg("Selecione o texto acima e copie à mão (Ctrl+C).", "err");
+    }
+  });
+
+  function markExported() {
+    state.lastExportAt = nowISO();
+    saveState();
+    updateBanner();
+  }
+
+  document.getElementById("btn-import").addEventListener("click", function () {
+    var raw = backupText.value.trim();
+    if (!raw) { setMsg("Cole um JSON no campo acima primeiro.", "err"); return; }
+    var parsed;
+    try { parsed = JSON.parse(raw); }
+    catch (e) { setMsg("JSON inválido — nada foi alterado.", "err"); return; }
+    if (!parsed || typeof parsed !== "object" || !parsed.items || typeof parsed.items !== "object") {
+      setMsg("Formato não reconhecido (falta \"items\") — nada foi alterado.", "err");
+      return;
+    }
+    var clean = {};
+    var validIds = {};
+    DATA.forEach(function (p) { p.trackable.forEach(function (it) { validIds[it.id] = true; }); });
+    var kept = 0;
+    Object.keys(parsed.items).forEach(function (k) {
+      if (validIds[k] && STATES.indexOf(parsed.items[k]) > 0) { clean[k] = parsed.items[k]; kept += 1; }
+    });
+    state.items = clean;
+    state.firstChangeAt = parsed.firstChangeAt || parsed.lastChangeAt || nowISO();
+    state.lastChangeAt = parsed.lastChangeAt || nowISO();
+    state.lastExportAt = parsed.lastExportAt || state.lastExportAt;
+    saveState();
+    rerenderStates();
+    setMsg("Importado: " + kept + " item(ns) com progresso.", "ok");
+  });
+
+  function rerenderStates() {
+    DATA.forEach(function (p) {
+      p.trackable.forEach(function (it) {
+        var li = phasesEl.querySelector('.item[data-id="' + it.id + '"]');
+        if (!li) return;
+        var st = state.items[it.id] || "not_started";
+        li.dataset.state = st;
+        setToggleLabel(li.querySelector(".toggle"), st);
+      });
+    });
+    refreshProgress();
+    updateSaveStatus();
+    updateBanner();
+  }
+
+  // ---------- expand / collapse all ----------
+  var expandBtn = document.getElementById("btn-expand");
+  function allOpen() {
+    return DATA.every(function (p) { return !state.ui.collapsed[p.id]; });
+  }
+  function syncExpandBtn() {
+    expandBtn.textContent = allOpen() ? "Recolher tudo" : "Expandir tudo";
+  }
+  expandBtn.addEventListener("click", function () {
+    var open = !allOpen();
+    DATA.forEach(function (p) {
+      state.ui.collapsed[p.id] = !open;
+      var sec = phasesEl.querySelector('.phase[data-phase="' + p.id + '"]');
+      sec.dataset.open = open ? "true" : "false";
+      sec.querySelector(".phase-head").setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    saveState();
+    syncExpandBtn();
+  });
+
+  // ---------- reset (two-click confirm) ----------
+  var resetBtn = document.getElementById("btn-reset");
+  var resetArmed = false, resetTimer = null;
+  resetBtn.addEventListener("click", function () {
+    if (!resetArmed) {
+      resetArmed = true;
+      resetBtn.textContent = "clique de novo para confirmar";
+      resetTimer = setTimeout(function () {
+        resetArmed = false;
+        resetBtn.textContent = "zerar progresso";
+      }, 4000);
+      return;
+    }
+    clearTimeout(resetTimer);
+    resetArmed = false;
+    resetBtn.textContent = "zerar progresso";
+    state.items = {};
+    state.firstChangeAt = null;
+    state.lastChangeAt = null;
+    state.ui.bannerDismissed = false;
+    saveState();
+    rerenderStates();
+  });
+
+  // ---------- init ----------
+  refreshProgress();
+  updateSaveStatus();
+  updateBanner();
+  syncExpandBtn();
+  setInterval(function () {
+    updateSaveStatus();
+    updateBanner();
+  }, 60000);
+})();
+</script>
+</body>
+</html>
