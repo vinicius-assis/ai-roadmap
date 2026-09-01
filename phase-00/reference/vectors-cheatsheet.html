@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Referência · Colinha de Vetores &amp; Cosseno</title>
+  <link rel="stylesheet" href="../assets/course.css">
+  <style>
+    :root { --maxw: 46rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.9rem; }
+    th, td { border: 1px solid var(--rule); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--note-bg); font-family: system-ui, sans-serif; }
+    td code { font-size: 0.82em; }
+  </style>
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="../lessons/0005-vectors-dot-product-cosine.html">← Lição 5</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Referência</p>
+  <h1>Colinha de Vetores &amp; Cosseno</h1>
+  <p class="subtitle">A matemática de embeddings, comprimida. Imprima e revise antes das lições de RAG.</p>
+
+  <h2>Vocabulário</h2>
+  <table>
+    <tr><th>Termo</th><th>É</th></tr>
+    <tr><td><span class="key">Vetor</span></td><td>uma lista de números, <code>number[]</code>. Cada número é uma coordenada num eixo.</td></tr>
+    <tr><td><span class="key">Embedding</span></td><td>o vetor que um modelo produz pra representar o <em>significado</em> de um texto (ex.: 1536 números na OpenAI).</td></tr>
+    <tr><td><span class="key">Produto escalar</span> (<code>a · b</code>)</td><td>componente a componente, multiplica e soma. Resultado: um número.</td></tr>
+    <tr><td><span class="key">Norma</span> / magnitude (<code>‖v‖</code>)</td><td>comprimento do vetor: <code>√(Σ vᵢ²)</code>.</td></tr>
+    <tr><td><span class="key">Normalizar</span> (unitário)</td><td>dividir cada componente por <code>‖v‖</code> → novo vetor de comprimento 1, mesma direção.</td></tr>
+    <tr><td><span class="key">Similaridade de cosseno</span></td><td>cosseno do ângulo entre dois vetores: <code>(a · b) / (‖a‖ ‖b‖)</code>. Faixa <code>[−1, 1]</code>.</td></tr>
+    <tr><td><span class="key">top-k</span></td><td>os <code>k</code> vetores com maior similaridade contra a consulta.</td></tr>
+  </table>
+
+  <h2>Fórmulas</h2>
+  <pre><code>a · b   = Σ aᵢ·bᵢ                    // (1·2)+(2·0)+(2·1) = 4
+‖v‖     = √(Σ vᵢ²)  = √(v · v)       // √(1+4+4) = 3
+cos(a,b) = (a · b) / (‖a‖ · ‖b‖)     // 4 / (3 · 2.236) ≈ 0.596
+unit(v)  = v / ‖v‖                    // comprimento vira 1</code></pre>
+
+  <h2>Interpretação do cosseno</h2>
+  <table>
+    <tr><th>Valor</th><th>Ângulo</th><th>Significado</th></tr>
+    <tr><td><code>+1</code></td><td>0°</td><td>mesma direção — mesmo assunto</td></tr>
+    <tr><td><code>~0.8–0.95</code></td><td>pequeno</td><td>faixa útil típica em busca de texto</td></tr>
+    <tr><td><code>0</code></td><td>90°</td><td>perpendiculares — sem relação</td></tr>
+    <tr><td><code>−1</code></td><td>180°</td><td>opostos (raro em embeddings de texto)</td></tr>
+  </table>
+
+  <h2>Implementação de referência (TS)</h2>
+  <pre><code>const dot = (a: number[], b: number[]) =&gt;
+  a.reduce((s, x, i) =&gt; s + x * b[i], 0);
+
+const norm = (v: number[]) =&gt; Math.sqrt(dot(v, v));
+
+const cosine = (a: number[], b: number[]) =&gt;
+  dot(a, b) / (norm(a) * norm(b));
+
+const unit = (v: number[]) =&gt; {
+  const n = norm(v);
+  return v.map((x) =&gt; x / n);
+};
+
+// ranquear docs contra uma consulta
+docs
+  .map((d) =&gt; ({ ...d, score: cosine(consulta, d.v) }))
+  .sort((a, b) =&gt; b.score - a.score);   // maior primeiro</code></pre>
+
+  <h2>Pegadinhas</h2>
+  <ul>
+    <li><span class="key">Produto escalar cru</span> mistura alinhamento com comprimento. Use cosseno, a menos que os vetores já sejam unitários.</li>
+    <li>Se os embeddings <span class="key">já vêm normalizados</span> (OpenAI, a maioria): <code>cos(a,b) = a · b</code>. Bancos vetoriais chamam isso de "inner product".</li>
+    <li><code>sort</code> sem comparador ordena como <em>string</em>. Sempre <code>.sort((a,b) =&gt; b.score - a.score)</code>.</li>
+    <li>Vetores de tamanhos diferentes não têm produto escalar — os dois embeddings precisam vir do <em>mesmo</em> modelo.</li>
+    <li>Distância euclidiana e cosseno dão a <em>mesma ordem</em> quando os vetores são unitários; fora disso, não.</li>
+  </ul>
+
+  <div class="footer">
+    <p>
+      Da <a href="../lessons/0005-vectors-dot-product-cosine.html">Lição 5 — Vetores, produto escalar e cosseno</a>.
+      Fontes: <a href="https://www.3blue1brown.com/lessons/dot-products">3Blue1Brown — Dot products</a> ·
+      <a href="https://en.wikipedia.org/wiki/Cosine_similarity">Wikipedia — Cosine similarity</a>.
+    </p>
+    <p><a href="../MISSION.md">Missão</a> · <a href="../roadmap.md">Roadmap</a> (Fase 0)</p>
+  </div>
+</div>
+</body>
+</html>

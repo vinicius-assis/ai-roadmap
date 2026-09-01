@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Referência · Colinha de Amostragem</title>
+  <link rel="stylesheet" href="../assets/course.css">
+  <style>
+    :root { --maxw: 46rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.9rem; }
+    th, td { border: 1px solid var(--rule); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--note-bg); font-family: system-ui, sans-serif; }
+    td code { font-size: 0.82em; }
+  </style>
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="../lessons/0006-probability-sampling-temperature-topp.html">← Lição 6</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Referência</p>
+  <h1>Colinha de Amostragem</h1>
+  <p class="subtitle">Como um LLM escolhe o próximo token, comprimido. Imprima e revise antes das lições de API.</p>
+
+  <h2>Vocabulário</h2>
+  <table>
+    <tr><th>Termo</th><th>É</th></tr>
+    <tr><td><span class="key">Logit</span></td><td>o número bruto que o modelo produz por token (pré-softmax). Pode ser negativo; não soma 1.</td></tr>
+    <tr><td><span class="key">Softmax</span></td><td>converte logits em probabilidades: <code>exp(lᵢ) / Σ exp(lⱼ)</code>. Exponenciar amplifica diferenças.</td></tr>
+    <tr><td><span class="key">Amostrador</span> (sampler)</td><td>o que sorteia o próximo token a partir da distribuição de probabilidade.</td></tr>
+    <tr><td><span class="key">Greedy decoding</span></td><td>sempre pegar o token de maior probabilidade. É o limite de <code>temperature → 0</code>.</td></tr>
+    <tr><td><span class="key">temperature</span> (T)</td><td>divisor dos logits antes do softmax: <code>softmax(lᵢ / T)</code>. Controla o quão afiada é a distribuição.</td></tr>
+    <tr><td><span class="key">top_p</span> (nucleus)</td><td>mantém o menor conjunto do topo cuja prob. acumulada ≥ <code>p</code>; descarta a cauda; renormaliza.</td></tr>
+    <tr><td><span class="key">top_k</span></td><td>mantém os <code>k</code> tokens mais prováveis (número fixo). Menos usado que <code>top_p</code>.</td></tr>
+  </table>
+
+  <h2>Fórmulas</h2>
+  <pre><code>softmax(l, T)ᵢ = exp(lᵢ / T) / Σⱼ exp(lⱼ / T)
+
+// estabilidade numérica: subtraia max(l/T) de cada termo antes do exp
+// (resultado idêntico, evita Infinity)
+
+top_p:  ordene p decrescente; some até passar de p; fique com esse prefixo; renormalize
+top_k:  ordene p decrescente; fique com os k primeiros; renormalize</code></pre>
+
+  <h2>O que a temperature faz</h2>
+  <table>
+    <tr><th>T</th><th>Efeito na distribuição</th><th>Comportamento</th></tr>
+    <tr><td><code>→ 0</code></td><td>um token com ~100%</td><td>greedy; quase determinístico; repetitivo</td></tr>
+    <tr><td><code>&lt; 1</code></td><td>mais afiada (diferenças ampliadas)</td><td>focado, previsível — extração, código, classificação</td></tr>
+    <tr><td><code>= 1</code></td><td>distribuição crua do modelo</td><td>padrão da maioria das APIs</td></tr>
+    <tr><td><code>&gt; 1</code></td><td>mais plana (cauda ganha peso)</td><td>criativo; alto demais → incoerência</td></tr>
+  </table>
+
+  <h2>Faixas e regras por provedor</h2>
+  <ul>
+    <li><span class="key">Anthropic</span>: <code>temperature</code> <code>0.0–1.0</code> (padrão <code>1.0</code>). Desde o Opus 4.1, <strong>não</strong> aceita <code>temperature</code> e <code>top_p</code> na mesma chamada.</li>
+    <li><span class="key">OpenAI</span>: <code>temperature</code> <code>0–2</code> (padrão <code>1</code>), <code>top_p</code> <code>0–1</code> (padrão <code>1</code>). Recomendam mexer em um só.</li>
+    <li>Ajuste <code>temperature</code> primeiro; <code>top_p</code> só pra controle fino.</li>
+    <li><code>T = 0</code> não garante saída idêntica — há não-determinismo de execução/hardware.</li>
+  </ul>
+
+  <h2>Pontos de partida por tarefa</h2>
+  <table>
+    <tr><th>Tarefa</th><th>temperature</th></tr>
+    <tr><td>extração, classificação, JSON estruturado, código</td><td><code>0.0 – 0.3</code></td></tr>
+    <tr><td>Q&amp;A, RAG, assistente factual</td><td><code>0.2 – 0.5</code></td></tr>
+    <tr><td>conversa natural</td><td><code>0.7</code></td></tr>
+    <tr><td>brainstorm, ficção, marketing</td><td><code>1.0+</code></td></tr>
+  </table>
+
+  <h2>Implementação de referência (TS)</h2>
+  <pre><code>function softmax(logits: number[], T = 1): number[] {
+  const scaled = logits.map((l) =&gt; l / T);
+  const max = Math.max(...scaled);
+  const exps = scaled.map((s) =&gt; Math.exp(s - max));
+  const sum = exps.reduce((a, b) =&gt; a + b, 0);
+  return exps.map((e) =&gt; e / sum);
+}
+
+// sorteio "roleta" respeitando as probabilidades
+function sample(probs: number[]): number {
+  const r = Math.random();
+  let cum = 0;
+  for (let i = 0; i &lt; probs.length; i++) {
+    cum += probs[i];
+    if (r &lt; cum) return i;
+  }
+  return probs.length - 1; // fallback p/ erro de ponto flutuante
+}
+
+function topP(probs: number[], p: number): number[] {
+  const idx = probs.map((v, i) =&gt; i).sort((a, b) =&gt; probs[b] - probs[a]);
+  const keep = new Set&lt;number&gt;();
+  let cum = 0;
+  for (const i of idx) { keep.add(i); cum += probs[i]; if (cum &gt;= p) break; }
+  const kept = idx.filter((i) =&gt; keep.has(i)).reduce((s, i) =&gt; s + probs[i], 0);
+  return probs.map((v, i) =&gt; (keep.has(i) ? v / kept : 0));
+}</code></pre>
+
+  <h2>Pegadinhas</h2>
+  <ul>
+    <li>Sem subtrair o <code>max</code> antes do <code>exp</code>, logits grandes viram <code>Infinity</code> e o softmax vira <code>NaN</code>.</li>
+    <li><code>temperature</code> é divisor: <code>T &lt; 1</code> <em>aumenta</em> o contraste, não diminui. Fácil de inverter na cabeça.</li>
+    <li><code>top_p = 0</code> não faz sentido (núcleo vazio); o mínimo útil ainda mantém ao menos 1 token.</li>
+    <li>Passar <code>temperature</code> <strong>e</strong> <code>top_p</code> pra Anthropic → erro. Escolha um.</li>
+    <li>Parâmetros de amostragem não consertam alucinação — só regulam diversidade vs. foco.</li>
+  </ul>
+
+  <div class="footer">
+    <p>
+      Da <a href="../lessons/0006-probability-sampling-temperature-topp.html">Lição 6 — Amostragem, temperature e top_p</a>.
+      Fontes: <a href="https://huggingface.co/blog/how-to-generate">Hugging Face — How to generate text</a> ·
+      <a href="https://docs.anthropic.com/en/api/messages">Anthropic — Messages API</a>.
+    </p>
+    <p><a href="../MISSION.md">Missão</a> · <a href="../roadmap.md">Roadmap</a> (Fase 0)</p>
+  </div>
+</div>
+</body>
+</html>

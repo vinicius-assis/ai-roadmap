@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lição 1 · O modelo mental de async/await</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="0002-async-iterators-streaming.html">Lição 2 →</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Lição 1 · ~20 min</p>
+  <h1>O que o <code>await</code> realmente faz</h1>
+  <p class="subtitle">Um modelo mental para async/await, e o tratamento de erro que vem junto.</p>
+
+  <div class="why">
+    Toda chamada a um SDK de LLM é assíncrona. <code>const res = await client.messages.create(&hellip;)</code>
+    envia uma requisição HTTP e o modelo leva segundos para responder. Se você não tem uma imagem
+    nítida do que o seu programa faz <em>durante</em> esses segundos, streaming, retries, tratamento
+    de rate limit e chamadas paralelas vão todos parecer mágica impossível de depurar. Esta lição
+    constrói essa imagem.
+  </div>
+
+  <h2>1. Uma Promise é uma caixa que vai conter um valor depois</h2>
+  <p>
+    Quando você chama algo assíncrono — <code>fetch(url)</code>, um método de SDK — você não recebe
+    o resultado. Você recebe uma <span class="key">Promise</span>: um objeto que agora está
+    <em>pendente</em> (pending) e depois vai <em>resolver</em> (fulfill) com um valor ou
+    <em>rejeitar</em> (reject) com um erro.
+  </p>
+  <pre><code>const p = fetch("https://api.exemplo.com/models");
+console.log(p); // Promise { &lt;pending&gt; }  — os dados NÃO estão aqui ainda</code></pre>
+
+  <h2>2. <code>await</code> abre a caixa — e pausa esta função</h2>
+  <p>
+    <code>await p</code> faz duas coisas: <span class="key">suspende a função async atual</span>
+    até <code>p</code> se resolver, e então retorna o valor resolvido (ou lança a rejeição como erro).
+    O ponto crucial: só <em>esta</em> função pausa. O resto do programa — o event loop — continua rodando.
+  </p>
+  <pre><code>async function listarModelos() {
+  console.log("A: prestes a dar await");
+  const res = await fetch("https://api.exemplo.com/models"); // suspende aqui
+  console.log("C: resposta chegou");                         // retoma aqui depois
+  return res.json();
+}
+
+console.log("1: antes da chamada");
+listarModelos();
+console.log("2: depois da chamada");   // roda ANTES de "C" — listarModelos está estacionada
+
+// Ordem da saída: 1  →  A  →  2  →  C</code></pre>
+  <p>
+    <code>"2"</code> aparece antes de <code>"C"</code> porque chamar uma função async a executa
+    de forma síncrona <em>até o primeiro <code>await</code></em>, e então devolve o controle. A
+    continuação depois do <code>await</code> fica na fila para quando a Promise resolver.
+    (<a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Reference/Operators/await">MDN: <code>await</code></a>)
+  </p>
+
+  <div class="quiz" data-answer="B">
+    <p class="q">No código acima, qual é a ordem correta da saída?</p>
+    <button data-opt="A">um, aaa, ccc, dois</button>
+    <button data-opt="B">um, aaa, dois, ccc</button>
+    <button data-opt="C">aaa, um, dois, ccc</button>
+    <p class="explain" hidden>
+      <strong>B.</strong> <code>listarModelos()</code> roda de forma síncrona até o <code>await</code>,
+      então <code>"1"</code> e depois <code>"A"</code> aparecem. Aí ela suspende e o controle volta
+      para quem chamou, então <code>"2"</code> aparece. <code>"C"</code> só roda depois que a Promise
+      do fetch resolve, num tick posterior do event loop.
+    </p>
+  </div>
+
+  <h2>3. async/await É Promise — só que legível</h2>
+  <p>Estas duas funções são equivalentes. <code>async/await</code> é açúcar sintático sobre a mesma máquina.</p>
+  <pre><code>// Cadeia de Promise
+function obterResposta() {
+  return client.messages.create({ /* ... */ })
+    .then(msg =&gt; msg.content[0].text)
+    .then(text =&gt; text.trim());
+}
+
+// async/await
+async function obterResposta() {
+  const msg = await client.messages.create({ /* ... */ });
+  const text = msg.content[0].text;
+  return text.trim();
+}</code></pre>
+  <p>
+    Uma função <code>async</code> <em>sempre</em> retorna uma Promise. <code>return text.trim()</code>
+    resolve essa Promise; um <code>throw</code> a rejeita.
+  </p>
+
+  <h2>4. Tratamento de erro: <code>.catch()</code> vira <code>try/catch</code></h2>
+  <p>
+    Uma Promise rejeitada que você deu <code>await</code> lança uma exceção de verdade naquela linha. Envolva.
+  </p>
+  <pre><code>async function obterResposta() {
+  try {
+    const msg = await client.messages.create({ /* ... */ });
+    return msg.content[0].text.trim();
+  } catch (err) {
+    // falha de rede, rate limit 429, 500 da API — tudo cai aqui
+    console.error("chamada ao modelo falhou:", err);
+    throw err; // ou retorne um fallback
+  }
+}</code></pre>
+  <div class="note">
+    <strong>Armadilha:</strong> um erro dentro de uma função async que ninguém deu <code>await</code>
+    nem <code>.catch()</code> vira uma <em>unhandled promise rejection</em> — não quebra no ponto da
+    chamada e é fácil de não perceber. Sempre tenha um <code>try/catch</code> ou um <code>.catch()</code>
+    em algum ponto da cadeia.
+  </div>
+
+  <h2>5. Sequencial vs paralelo — o erro que dobra sua latência</h2>
+  <pre><code>// LENTO: 2 segundos — a segunda chamada espera a primeira
+const a = await modelo.perguntar("resuma o doc A");
+const b = await modelo.perguntar("resuma o doc B");
+
+// RÁPIDO: ~1 segundo — as duas requisições ao mesmo tempo
+const [a, b] = await Promise.all([
+  modelo.perguntar("resuma o doc A"),
+  modelo.perguntar("resuma o doc B"),
+]);</code></pre>
+  <p>
+    Use <code>await</code> dentro de um loop só quando cada passo realmente depende do anterior.
+    Chamadas independentes vão para <code>Promise.all</code>.
+  </p>
+
+  <div class="quiz" data-answer="C">
+    <p class="q">Quando dar await em chamadas uma após a outra em vez de Promise.all?</p>
+    <button data-opt="A">Sempre que o codigo ficar mais simples de ler assim</button>
+    <button data-opt="B">Sempre, porque requisicoes paralelas batem no rate limit</button>
+    <button data-opt="C">So quando cada chamada precisa do resultado da anterior</button>
+    <p class="explain" hidden>
+      <strong>C.</strong> <code>await</code> sequencial é correto quando há dependência real de dados
+      (chamada 2 precisa da saída da chamada 1). Fora disso, você só serializa trabalho que poderia
+      acontecer em paralelo, adicionando latência à toa. Rate limit se resolve com backoff (Lição 3),
+      não deixando tudo sequencial.
+    </p>
+  </div>
+
+  <h2>Sua vitória de hoje</h2>
+  <p>Você agora consegue:</p>
+  <ul>
+    <li>prever a ordem de execução em volta de um <code>await</code>;</li>
+    <li>converter uma cadeia <code>.then()</code> para <code>async/await</code> com <code>try/catch</code>;</li>
+    <li>identificar quando usar <code>Promise.all</code> em vez de awaits sequenciais.</li>
+  </ul>
+
+  <h3>Prática (10 min, faça num arquivo de verdade)</h3>
+  <p>
+    <strong>Objetivo do exercício inteiro:</strong> ver com seus próprios olhos que 3 <code>await</code>
+    em sequência levam ~3&times;500&nbsp;ms, enquanto <code>Promise.all</code> leva ~1&times;500&nbsp;ms.
+    A função <code>dobrarDevagar</code> é só uma "operação lenta" de mentira, fingindo ser uma
+    chamada de API.
+  </p>
+  <ol>
+    <li>
+      <strong>Construa a função lenta.</strong> <code>async function dobrarDevagar(n: number): Promise&lt;number&gt;</code>.
+      Dentro dela, na ordem:
+      <ol type="a">
+        <li>uma linha que só <em>pausa</em> por 500&nbsp;ms — <code>await new Promise(r =&gt; setTimeout(r, 500))</code>, sozinha, sem <code>return</code>;</li>
+        <li>depois, <code>return n * 2</code>.</li>
+      </ol>
+    </li>
+    <li>
+      <strong>Meça o sequencial.</strong> <code>const inicio = Date.now()</code>, depois
+      <code>await dobrarDevagar(...)</code> três vezes, uma linha após a outra. No fim,
+      <code>console.log(Date.now() - inicio)</code>. Espere ~1500&nbsp;ms.
+    </li>
+    <li>
+      <strong>Meça o paralelo.</strong> Novo <code>inicio</code>. Rode as três chamadas com
+      <code>await Promise.all([ ... ])</code> (um <code>await</code> só, uma lista com as 3 chamadas).
+      Imprima o tempo. Espere ~500&nbsp;ms.
+    </li>
+    <li>
+      <strong>Trate um erro.</strong> Faça <code>dobrarDevagar</code> dar <code>throw new Error("boom")</code>
+      quando <code>n &lt; 0</code>. Chame com <code>-1</code> dentro de um <code>try/catch</code> para o
+      programa imprimir uma mensagem em vez de quebrar.
+    </li>
+  </ol>
+  <p>Rode com <code>npx tsx practice.ts</code> (ou <code>node</code> se compilar). Me mande o arquivo de volta que eu reviso.</p>
+
+  <h3>Fonte primária para ler em seguida</h3>
+  <p>
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Guide/Using_promises">MDN — Usando promises</a>.
+    Leia as seções "Encadeamento", "Tratamento de erros" e "Composição". ~15 minutos. É a
+    referência canônica e tudo nesta lição mapeia nela.
+  </p>
+
+  <div class="ask">
+    <strong>Eu sou seu professor — pergunte o que quiser.</strong> Confuso sobre o event loop,
+    microtasks vs macrotasks, top-level await, ou como isso fica com o SDK real da Anthropic/OpenAI?
+    Manda a dúvida. Ponto obscuro agora vira bug na Fase 5.
+  </div>
+
+  <div class="footer">
+    <p>
+      Próxima: <strong>Lição 2 — Iteradores assíncronos &amp; <code>for await...of</code></strong>:
+      consumir um stream de tokens, a forma que o roadmap destaca para SDKs de LLM.
+    </p>
+    <p>
+      Referência: <a href="../reference/async-ts-cheatsheet.html">Colinha de Async TS</a> ·
+      <a href="../MISSION.md">Missão</a> ·
+      <a href="../roadmap.md">Roadmap</a> (Fase 0)
+    </p>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+</div>
+</body>
+</html>

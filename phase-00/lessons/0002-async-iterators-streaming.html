@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lição 2 · Iteradores assíncronos e for await...of</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="0001-async-await-mental-model.html">← Lição 1</a>
+    <a class="nav-btn" href="0003-defensive-api-calls.html">Lição 3 →</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Lição 2 · ~25 min</p>
+  <h1>Consumindo um stream de tokens</h1>
+  <p class="subtitle">Iteradores assíncronos, <code>for await...of</code> e async generators.</p>
+
+  <div class="why">
+    Quando você chama um LLM com <code>stream: true</code>, a resposta não chega de uma vez —
+    chega em pedacinhos (<em>chunks</em>), um token ou poucos tokens por vez, ao longo de vários
+    segundos. É isso que faz o texto "aparecer digitando" no ChatGPT/Claude. Do lado do código,
+    esse stream é um <span class="key">iterável assíncrono</span>, e a ferramenta pra consumir é
+    o <code>for await...of</code>. Sem isso você fica preso a esperar a resposta inteira.
+  </div>
+
+  <h2>1. Lembra do <code>for...of</code>? Agora com <code>await</code></h2>
+  <p>
+    <code>for...of</code> percorre uma coleção que já está inteira na memória (um array, um Set).
+    <code>for await...of</code> percorre uma fonte que <span class="key">produz valores ao longo
+    do tempo</span> — e pausa a cada volta até o próximo valor chegar.
+  </p>
+  <pre><code>// síncrono: todos os itens já existem
+for (const n of [1, 2, 3]) {
+  console.log(n);
+}
+
+// assíncrono: cada item chega quando chega
+for await (const chunk of stream) {
+  process.stdout.write(chunk);   // imprime conforme recebe
+}</code></pre>
+  <p>
+    Cada iteração do <code>for await...of</code> faz um <code>await</code> implícito no "próximo
+    item". O loop só continua quando esse item resolve. Fim do stream = fim do loop.
+    (<a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Reference/Statements/for-await...of">MDN: <code>for await...of</code></a>)
+  </p>
+
+  <h2>2. Do outro lado: async generators produzem o stream</h2>
+  <p>
+    Uma <span class="key">função geradora assíncrona</span> — <code>async function*</code> — é
+    a forma mais simples de <em>criar</em> um iterável assíncrono. Cada <code>yield</code> entrega
+    um valor pra quem está consumindo; a função pausa ali até pedirem o próximo.
+  </p>
+  <pre><code>async function* gerarPedacos(): AsyncGenerator&lt;string&gt; {
+  const palavras = ["Oi", " ", "mundo", "!"];
+  for (const p of palavras) {
+    await new Promise((r) =&gt; setTimeout(r, 300)); // simula latência da rede
+    yield p;                                       // entrega um chunk
+  }
+}
+
+for await (const pedaco of gerarPedacos()) {
+  process.stdout.write(pedaco);   // "Oi" ... " " ... "mundo" ... "!"
+}
+// texto aparece aos poucos, ~300ms entre cada pedaço</code></pre>
+  <div class="note">
+    <strong>Isto é praticamente a API real.</strong> O SDK da Anthropic devolve exatamente uma
+    coisa dessas: <code>const stream = await client.messages.create({ stream: true, ... })</code>
+    e depois <code>for await (const event of stream)</code>. Os <code>event</code> são objetos com
+    um tipo (<code>content_block_delta</code> etc.) e o texto fica em <code>event.delta.text</code>.
+  </div>
+
+  <div class="quiz" data-answer="B">
+    <p class="q">O que o for await...of faz ao chegar no fim de cada volta do loop?</p>
+    <button data-opt="A">Segue direto para a proxima volta sem nunca parar ali</button>
+    <button data-opt="B">Espera o proximo item resolver antes de continuar o loop</button>
+    <button data-opt="C">Junta todos os itens num array e devolve tudo no fim</button>
+    <p class="explain" hidden>
+      <strong>B.</strong> Cada iteração dá um <code>await</code> implícito no próximo item. O corpo
+      do loop só roda de novo quando esse item chega. Por isso o <code>for await...of</code> é a
+      ferramenta certa pra stream: ele consome no ritmo em que os dados aparecem, sem bufferizar
+      tudo antes.
+    </p>
+  </div>
+
+  <h2>3. O ganho concreto: primeira palavra na tela quase na hora</h2>
+  <p>
+    Sem stream, o usuário olha pra uma tela parada até a resposta inteira ficar pronta — pode ser
+    10, 20 segundos. Com stream, a primeira palavra aparece em ~500ms e o resto vai chegando. A
+    <span class="key">latência total é a mesma</span>, mas a <span class="key">latência percebida</span>
+    despenca. Para produto, isso é decisivo.
+  </p>
+  <pre><code>// sem stream — bloqueia até o fim
+const msg = await client.messages.create({ /* ... */ });
+console.log(msg.content[0].text);   // tudo de uma vez, depois de 12s
+
+// com stream — mostra conforme gera
+const stream = await client.messages.create({ stream: true, /* ... */ });
+let completo = "";
+for await (const event of stream) {
+  if (event.type === "content_block_delta") {
+    completo += event.delta.text;
+    process.stdout.write(event.delta.text);   // aparece token a token
+  }
+}</code></pre>
+
+  <h2>4. Acumular enquanto faz stream</h2>
+  <p>
+    Padrão que você vai repetir muito: mostrar cada pedaço <em>e</em> montar a string completa pra
+    usar depois (salvar no banco, logar, devolver numa API). Um <code>let completo = ""</code>
+    fora do loop, <code>completo += pedaco</code> dentro. Simples assim.
+  </p>
+
+  <h2>5. Erro no meio do stream</h2>
+  <p>
+    A conexão pode cair na terceira palavra de vinte. Um <code>for await...of</code> propaga esse
+    erro como <code>throw</code> — então a mesma regra da Lição 1 vale: envolva com
+    <code>try/catch</code> se precisar tratar. O que você já acumulou em <code>completo</code>
+    continua lá; decida se aproveita o parcial ou descarta.
+  </p>
+  <pre><code>let completo = "";
+try {
+  for await (const pedaco of gerarPedacos()) {
+    completo += pedaco;
+  }
+} catch (err) {
+  console.error("stream caiu; tinha até aqui:", completo);
+}</code></pre>
+
+  <div class="quiz" data-answer="A">
+    <p class="q">Por que fazer stream se a latencia total ate a resposta completa nao muda?</p>
+    <button data-opt="A">A latencia percebida cai: o usuario ve texto quase imediatamente</button>
+    <button data-opt="B">O custo em tokens fica menor quando a resposta vem em pedacos</button>
+    <button data-opt="C">O modelo pensa melhor quando entrega a resposta aos poucos ali</button>
+    <p class="explain" hidden>
+      <strong>A.</strong> O total de tempo até o último token é praticamente igual. O que muda é
+      que a primeira palavra aparece em centenas de milissegundos em vez de dezenas de segundos —
+      a espera <em>sentida</em> some. Custo por token e qualidade da resposta não têm relação com
+      streaming.
+    </p>
+  </div>
+
+  <h2>Sua vitória de hoje</h2>
+  <ul>
+    <li>consumir qualquer iterável assíncrono com <code>for await...of</code>;</li>
+    <li>criar um você mesmo com <code>async function*</code> e <code>yield</code>;</li>
+    <li>acumular a resposta completa enquanto faz stream, e tratar erro no meio.</li>
+  </ul>
+
+  <h3>Prática (15 min)</h3>
+  <p>
+    <strong>Objetivo:</strong> simular um stream de LLM e consumi-lo token a token, medindo quando
+    o <em>primeiro</em> token chega vs quando o <em>último</em> chega.
+  </p>
+  <ol>
+    <li>
+      <strong>Crie o gerador.</strong> <code>async function* stream(texto: string): AsyncGenerator&lt;string&gt;</code>.
+      Quebre <code>texto</code> em palavras (<code>texto.split(" ")</code>). Para cada palavra:
+      <code>await</code> 200&nbsp;ms, depois <code>yield</code> a palavra + <code>" "</code>.
+    </li>
+    <li>
+      <strong>Consuma com timing.</strong> <code>const t0 = Date.now()</code>. Num
+      <code>for await...of</code> sobre <code>stream("o rato roeu a roupa do rei")</code>:
+      no primeiro pedaço, imprima <code>"primeiro token:", Date.now() - t0</code>; a cada pedaço,
+      <code>process.stdout.write(pedaco)</code>; acumule em <code>let completo = ""</code>.
+    </li>
+    <li>Depois do loop: imprima <code>"ultimo token:", Date.now() - t0</code> e <code>completo.trim()</code>.</li>
+    <li>
+      <strong>Erro no meio.</strong> Faça o gerador dar <code>throw new Error("conexao caiu")</code>
+      ao chegar na 4ª palavra. Envolva o consumo em <code>try/catch</code> e, no catch, imprima o
+      que tinha acumulado até então.
+    </li>
+  </ol>
+
+  <h3>Saída esperada (aproximada)</h3>
+  <pre><code>primeiro token: 201
+o rato roeu conexao caiu; acumulado ate aqui: "o rato roeu "</code></pre>
+  <p>
+    (Sem o <code>throw</code> do passo 4, você veria as 7 palavras e <code>ultimo token: ~1400</code>.)
+    Os milissegundos variam alguns pontos — o que importa é <code>primeiro token</code> perto de
+    200 e não de 1400.
+  </p>
+  <p>Rode com <code>npx tsx practice2.ts</code> e me mande o arquivo.</p>
+
+  <h3>Fonte primária</h3>
+  <p>
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Reference/Statements/for-await...of">MDN — <code>for await...of</code></a>
+    e, para ver a API real, <a href="https://docs.anthropic.com/en/docs/build-with-claude/streaming">Anthropic — Streaming Messages</a>
+    (seção "Streaming with SDKs"). ~15 min.
+  </p>
+
+  <div class="ask">
+    <strong>Sou seu professor — manda dúvida.</strong> Curioso sobre a diferença entre iterável
+    e iterador, o que é <code>Symbol.asyncIterator</code>, ou como ler um <code>ReadableStream</code>
+    do <code>fetch</code> (que é o que roda no navegador)? Pergunta.
+  </div>
+
+  <div class="footer">
+    <p>
+      Anterior: <a href="0001-async-await-mental-model.html">Lição 1 — modelo mental de async/await</a>.
+      Próxima: <strong>Lição 3 — chamadas de API defensivas</strong>: timeout com
+      <code>AbortController</code>, retry com backoff, tratamento de 429.
+    </p>
+    <p>
+      Referência: <a href="../reference/async-ts-cheatsheet.html">Colinha de Async TS</a> ·
+      <a href="../MISSION.md">Missão</a> · <a href="../roadmap.md">Roadmap</a> (Fase 0)
+    </p>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+</div>
+</body>
+</html>

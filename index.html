@@ -409,6 +409,26 @@
     padding: 1px 6px;
     white-space: nowrap;
   }
+  .content-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .content-link {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .66rem;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-radius: 5px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .content-link:hover, .content-link:focus-visible {
+    text-decoration: underline;
+  }
 
   .static {
     margin-top: 30px;
@@ -549,10 +569,22 @@
   // ---------- roadmap data ----------
   var DATA = [
     { id: "f0", name: "Fase 0 · Pré-requisitos", weeks: "1–2 semanas", items: [
-      { t: "Async em TS: Promises, async/await, streaming (SSE) — SDKs de LLM usam muito stream de tokens" },
-      { t: "APIs REST: retry, tratamento de erro, rate limit" },
-      { t: "Git / GitHub" },
-      { t: "Matemática mínima: vetores / produto escalar (embeddings), noções de probabilidade" }
+      { t: "Async em TS: Promises, async/await, streaming (SSE) — SDKs de LLM usam muito stream de tokens", links: [
+        { label: "Lição 1 — mental model", href: "phase-00/lessons/0001-async-await-mental-model.html" },
+        { label: "Lição 2 — iterators/streaming", href: "phase-00/lessons/0002-async-iterators-streaming.html" },
+        { label: "Lição 4 — generators/AbortController", href: "phase-00/lessons/0004-deep-dive-generators-abortcontroller.html" },
+        { label: "cheatsheet", href: "phase-00/reference/async-ts-cheatsheet.html" }
+      ] },
+      { t: "APIs REST: retry, tratamento de erro, rate limit", links: [
+        { label: "Lição 3 — defensive API calls", href: "phase-00/lessons/0003-defensive-api-calls.html" },
+        { label: "cheatsheet", href: "phase-00/reference/async-ts-cheatsheet.html" }
+      ] },
+      { t: "Matemática mínima: vetores / produto escalar (embeddings), noções de probabilidade", links: [
+        { label: "Lição 5 — vetores/cosine", href: "phase-00/lessons/0005-vectors-dot-product-cosine.html" },
+        { label: "vetores cheatsheet", href: "phase-00/reference/vectors-cheatsheet.html" },
+        { label: "Lição 6 — sampling/temperature", href: "phase-00/lessons/0006-probability-sampling-temperature-topp.html" },
+        { label: "sampling cheatsheet", href: "phase-00/reference/sampling-cheatsheet.html" }
+      ] }
     ]},
     { id: "f1", name: "Fase 1 · Fundamentos de ML/LLM", weeks: "2–3 semanas", items: [
       { t: "O que são LLMs, como funciona inferência" },
@@ -798,6 +830,20 @@
           badges.appendChild(s);
         });
         body.appendChild(badges);
+      }
+      if (it.links && it.links.length) {
+        var links = document.createElement("div");
+        links.className = "content-links";
+        it.links.forEach(function (lk) {
+          var a = document.createElement("a");
+          a.className = "content-link";
+          a.textContent = lk.label;
+          a.href = lk.href;
+          a.target = "_blank";
+          a.rel = "noopener";
+          links.appendChild(a);
+        });
+        body.appendChild(links);
       }
 
       li.appendChild(btn);

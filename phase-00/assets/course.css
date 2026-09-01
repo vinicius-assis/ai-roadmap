@@ -1,0 +1,152 @@
+/* course.css — shared stylesheet for all Phase 0 lessons and references.
+   Mirrors the visual language of the roadmap home page (index.html):
+   IBM Plex Sans/Mono, blue accent, card surfaces, light/dark aware. */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --paper: #ffffff;
+  --surface-2: #eef1f4;
+  --rule: #e0e3e8;
+  --ink: #1b1e26;
+  --muted: #626977;
+  --accent: #2f5fc0;
+  --ok: #2f8f6f;
+  --bad: #b0331a;
+  --code-bg: #eef1f4;
+  --note-bg: #eef1f4;
+  --shadow: 0 1px 2px rgba(20, 24, 34, .06), 0 8px 24px rgba(20, 24, 34, .05);
+  --maxw: 42rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131519;
+    --paper: #1b1e24;
+    --surface-2: #23272f;
+    --rule: #2d323c;
+    --ink: #e4e7ec;
+    --muted: #8b93a1;
+    --accent: #6f9bec;
+    --ok: #4bb890;
+    --bad: #e2705c;
+    --code-bg: #23272f;
+    --note-bg: #23272f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .28);
+  }
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  padding: 0 0 6rem;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.content {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 0;
+}
+
+h1, h2, h3 { font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
+h1 { font-size: 1.7rem; margin: 0 0 0.3rem; }
+h2 { font-size: 1.2rem; margin: 2.6rem 0 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.02rem; margin: 1.8rem 0 0.5rem; }
+
+.subtitle { color: var(--muted); margin: 0 0 2.2rem; }
+.eyebrow { text-transform: uppercase; letter-spacing: 0.1em; font-size: .72rem;
+  color: var(--muted); margin-bottom: 0.4rem; font-weight: 500; }
+
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+a:hover { border-bottom-color: var(--accent); }
+
+code { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.86em; background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+pre { background: var(--code-bg); padding: 1rem 1.2rem; border-radius: 8px;
+  overflow-x: auto; border: 1px solid var(--rule); }
+pre code { background: none; padding: 0; font-size: 0.8rem; line-height: 1.5; }
+
+.key { color: var(--accent); font-weight: 600; }
+
+.note {
+  background: var(--note-bg); border-left: 3px solid var(--accent);
+  padding: 0.8rem 1.1rem; margin: 1.5rem 0; font-size: 0.95rem; border-radius: 0 8px 8px 0;
+}
+.note strong { color: var(--accent); }
+
+.why {
+  border: 1px solid var(--rule); border-radius: 10px;
+  padding: 1rem 1.2rem; margin: 1.5rem 0; background: var(--paper); box-shadow: var(--shadow);
+}
+.why::before { content: "Why this matters for AI work"; display: block;
+  font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.4rem; font-weight: 500; }
+
+blockquote { margin: 1.5rem 0; padding-left: 1.2rem; border-left: 3px solid var(--rule);
+  color: var(--muted); }
+
+table { border-collapse: collapse; }
+th, td { border: 1px solid var(--rule); }
+th { background: var(--surface-2); }
+
+.footer { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
+  font-size: 0.85rem; color: var(--muted); }
+.footer a { border: none; }
+
+.ask { background: var(--note-bg); border: 1px dashed var(--rule); border-radius: 8px;
+  padding: 0.9rem 1.1rem; margin: 2rem 0; font-size: 0.9rem; }
+
+hr { border: none; border-top: 1px solid var(--rule); margin: 2.5rem 0; }
+
+/* ---------- content nav (mirrors index.html .topbar / .btn) ---------- */
+.content-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--rule);
+  font-size: .82rem;
+}
+.content-nav-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 12px 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.content-nav-side { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.content-nav-side.next { justify-content: flex-end; }
+.nav-btn {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 5px 11px;
+  font-size: .78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom-width: 1px;
+  transition: border-color .15s, background .15s;
+}
+.nav-btn:hover, .nav-btn:focus-visible { border-color: var(--accent); }
+.nav-btn.is-home { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--rule)); }
+
+@media print {
+  .content-nav { display: none; }
+  body { max-width: none; padding: 0; font-size: 11pt; background: #fff; }
+  a { color: var(--ink); border: none; }
+  .quiz button { display: none; }
+}

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lição 4 · Aprofundando: generators e AbortController</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="0003-defensive-api-calls.html">← Lição 3</a>
+    <a class="nav-btn" href="0005-vectors-dot-product-cosine.html">Lição 5 →</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Lição 4 · aprofundamento · ~35 min</p>
+  <h1>Aprofundando: generators e <code>AbortController</code></h1>
+  <p class="subtitle">Como as duas peças funcionam por dentro — e onde você vai usar de verdade.</p>
+
+  <div class="why">
+    Nas Lições 2 e 3 você <em>usou</em> generators e <code>AbortController</code> pra resolver um
+    problema. Aqui a gente abre a caixa: o protocolo de iteração, o <code>yield</code> nos dois
+    sentidos, um controller controlando várias operações de uma vez, e os helpers modernos
+    (<code>AbortSignal.timeout</code>, <code>AbortSignal.any</code>). É a diferença entre copiar
+    o padrão e saber ajustá-lo.
+  </div>
+
+  <hr>
+  <h1 style="border:none;">Parte A — Generator functions</h1>
+
+  <h2>A1. Comece pelo generator síncrono</h2>
+  <p>
+    Antes de <code>async function*</code>, entenda <code>function*</code>. Um generator é uma
+    função que <span class="key">pausa e retoma</span>. Chamar ela não roda o corpo — devolve um
+    <span class="key">iterador</span>. O corpo só anda quando você chama <code>.next()</code>.
+  </p>
+  <pre><code>function* contador() {
+  console.log("comecou");
+  yield 1;
+  console.log("entre 1 e 2");
+  yield 2;
+  return 99;          // vira { value: 99, done: true }
+}
+
+const it = contador();          // nada impresso ainda — só criou o iterador
+console.log(it.next());         // "comecou"  → { value: 1, done: false }
+console.log(it.next());         // "entre 1 e 2" → { value: 2, done: false }
+console.log(it.next());         // { value: 99, done: true }
+console.log(it.next());         // { value: undefined, done: true }</code></pre>
+  <p>
+    Cada <code>.next()</code> roda o corpo <span class="key">até o próximo <code>yield</code></span>,
+    entrega aquele valor com <code>done: false</code>, e congela tudo ali — variáveis locais
+    incluídas — até o próximo <code>.next()</code>. É <span class="key">lazy</span>: o trabalho só
+    acontece quando alguém puxa.
+  </p>
+
+  <h2>A2. <code>for...of</code> é açúcar pro protocolo</h2>
+  <pre><code>for (const n of contador()) {
+  console.log(n);   // 1, 2   — o `return 99` NÃO entra no for...of
+}</code></pre>
+  <p>
+    O <code>for...of</code> chama <code>.next()</code> em loop e para quando <code>done</code> fica
+    <code>true</code>. O <code>value</code> do passo final (o <code>return</code>) é ignorado pelo
+    <code>for...of</code> — ele só existe pra quem chama <code>.next()</code> na mão ou usa
+    <code>yield*</code>.
+  </p>
+
+  <h2>A3. <code>yield</code> vai nos dois sentidos</h2>
+  <p>
+    Isto quase ninguém sabe: <code>.next(x)</code> passa <code>x</code> <span class="key">de volta
+    pra dentro</span> do generator — é o valor que a expressão <code>yield</code> assume quando
+    retoma.
+  </p>
+  <pre><code>function* dialogo() {
+  const nome = yield "qual seu nome?";
+  const idade = yield `oi ${nome}, qual sua idade?`;
+  return `${nome} tem ${idade} anos`;
+}
+
+const d = dialogo();
+console.log(d.next().value);        // "qual seu nome?"
+console.log(d.next("Ana").value);   // "oi Ana, qual sua idade?"
+console.log(d.next(30).value);      // "Ana tem 30 anos"</code></pre>
+  <p>
+    O primeiro <code>.next()</code> não tem pra quem entregar valor (o generator ainda não parou
+    em nenhum <code>yield</code>), por isso o argumento dele é sempre descartado.
+  </p>
+
+  <h2>A4. <code>yield*</code> delega pra outro iterável</h2>
+  <pre><code>function* letras() { yield "a"; yield "b"; }
+function* tudo() {
+  yield 1;
+  yield* letras();   // "desenrola" o outro generator aqui
+  yield 2;
+}
+[...tudo()];   // [1, "a", "b", 2]</code></pre>
+
+  <h2>A5. Async generator = tudo isso + <code>await</code></h2>
+  <p>
+    <code>async function*</code> pode usar <code>await</code> no corpo. <code>.next()</code> agora
+    devolve uma <code>Promise&lt;{ value, done }&gt;</code>, e você consome com
+    <code>for await...of</code>. O resto do modelo é idêntico: lazy, pausa no <code>yield</code>,
+    congela o estado local.
+  </p>
+  <pre><code>async function* paginado(): AsyncGenerator&lt;number&gt; {
+  let pagina = 1;
+  while (true) {
+    const dados = await buscarPagina(pagina);   // simula fetch
+    if (dados.length === 0) return;             // acabou → encerra o iterável
+    for (const item of dados) yield item;       // entrega um a um
+    pagina++;
+  }
+}
+
+for await (const item of paginado()) {
+  console.log(item);   // consome sem nunca ter a lista inteira na memória
+}</code></pre>
+  <div class="why">
+    Este é o caso de uso nº 1 fora de streaming: <strong>paginação</strong>. APIs devolvem 100
+    resultados por página; um async generator te deixa escrever <code>for await (const x of
+    todosOsResultados())</code> e esconde o "busca próxima página quando acabar". SDKs de LLM
+    fazem exatamente isso pra listar modelos, arquivos, batches.
+  </div>
+
+  <div class="quiz" data-answer="C">
+    <p class="q">O que acontece no momento em que voce chama gen() (um generator)?</p>
+    <button data-opt="A">O corpo roda inteiro e o retorno fica guardado para depois</button>
+    <button data-opt="B">O corpo roda ate o primeiro yield e para esperando next</button>
+    <button data-opt="C">Nada do corpo roda: voce recebe um iterador ainda parado</button>
+    <p class="explain" hidden>
+      <strong>C.</strong> Chamar o generator só cria o objeto iterador. Nenhuma linha do corpo
+      executa até o primeiro <code>.next()</code> (ou a primeira volta de um <code>for...of</code> /
+      <code>for await...of</code>). É por isso que generators servem pra sequências infinitas e
+      pra trabalho caro sob demanda.
+    </p>
+  </div>
+
+  <h3>Prática A (15 min) — <code>pratice-04a.ts</code></h3>
+  <p><strong>Objetivo:</strong> sentir a preguiça (laziness) e a paginação.</p>
+  <ol>
+    <li>
+      <strong>Sequência infinita.</strong> <code>function* naturais()</code> — <code>let n = 1</code>,
+      <code>while (true) { yield n++; }</code>. Consuma com um <code>for...of</code> que dá
+      <code>break</code> depois de 5 valores. Imprima cada um. (Prova de que <code>while(true)</code>
+      não trava: só roda o que você puxa.)
+    </li>
+    <li>
+      <strong>Página falsa.</strong> <code>async function buscarPagina(p: number)</code>: <code>await</code>
+      100&nbsp;ms; se <code>p &gt; 3</code> retorne <code>[]</code>; senão retorne
+      <code>[p*10, p*10+1, p*10+2]</code> (3 itens).
+    </li>
+    <li>
+      <strong>Async generator de paginação.</strong> <code>async function* todos()</code> no molde
+      do A5: loop de páginas, <code>yield</code> item a item, <code>return</code> quando a página
+      vier vazia.
+    </li>
+    <li>Consuma <code>todos()</code> com <code>for await...of</code>, imprimindo cada item e contando o total no fim.</li>
+  </ol>
+  <h4>Saída esperada</h4>
+  <pre><code>1
+2
+3
+4
+5
+10
+11
+12
+20
+21
+22
+30
+31
+32
+total: 9</code></pre>
+
+  <hr>
+  <h1 style="border:none;">Parte B — <code>AbortController</code> a fundo</h1>
+
+  <h2>B1. Um controller, um signal, muitas operações</h2>
+  <p>
+    <code>new AbortController()</code> te dá dois lados:
+    <code>controller.signal</code> (você <em>passa</em> pra operações) e
+    <code>controller.abort(reason?)</code> (você <em>chama</em> pra cancelar). O mesmo
+    <code>signal</code> pode ir pra <span class="key">várias</span> chamadas — um
+    <code>abort()</code> cancela todas.
+  </p>
+  <pre><code>const ac = new AbortController();
+
+const tudo = Promise.all([
+  fetch("/a", { signal: ac.signal }),
+  fetch("/b", { signal: ac.signal }),
+  fetch("/c", { signal: ac.signal }),
+]);
+
+ac.abort();   // as três requisições são canceladas de uma vez</code></pre>
+
+  <h2>B2. O que o signal te oferece</h2>
+  <table style="border-collapse:collapse;width:100%;margin:1.2rem 0;font-size:0.9rem;">
+    <tr style="background:var(--note-bg);font-family:system-ui,sans-serif;">
+      <th style="border:1px solid var(--rule);padding:0.5rem;text-align:left;">Membro</th>
+      <th style="border:1px solid var(--rule);padding:0.5rem;text-align:left;">Pra quê</th>
+    </tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>signal.aborted</code></td><td style="border:1px solid var(--rule);padding:0.5rem;"><code>boolean</code> — já foi cancelado?</td></tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>signal.reason</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">o valor passado em <code>abort(reason)</code> (default: um <code>AbortError</code>)</td></tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>signal.throwIfAborted()</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">lança <code>reason</code> se já cancelou — pra checar dentro do seu loop</td></tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>signal.addEventListener("abort", fn)</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">roda <code>fn</code> no momento do cancelamento (fechar arquivo, limpar timer)</td></tr>
+  </table>
+  <pre><code>async function trabalhoLongo(signal: AbortSignal) {
+  for (let i = 0; i &lt; 1000; i++) {
+    signal.throwIfAborted();               // aborta cedo se pediram
+    await passoCaro(i);
+  }
+}</code></pre>
+
+  <h2>B3. Helpers modernos — menos código</h2>
+  <pre><code>// timeout puro, sem setTimeout manual:
+const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+
+// combinar: cancela se o usuário clicar OU se estourar 5s
+const doUsuario = new AbortController();
+const res2 = await fetch(url, {
+  signal: AbortSignal.any([doUsuario.signal, AbortSignal.timeout(5000)]),
+});
+</code></pre>
+  <p>
+    <code>AbortSignal.timeout(ms)</code> e <code>AbortSignal.any(signals)</code> são nativos em
+    Node 18+ e navegadores atuais. Na Lição 3 a gente montou o timeout na mão pra ver a mecânica;
+    em código real, prefira <code>AbortSignal.timeout</code>.
+    (<a href="https://developer.mozilla.org/pt-BR/docs/Web/API/AbortSignal/timeout_static">MDN: <code>AbortSignal.timeout</code></a>)
+  </p>
+
+  <h2>B4. Distinguir "cancelei" de "deu erro"</h2>
+  <pre><code>try {
+  await fetch(url, { signal: AbortSignal.timeout(3000) });
+} catch (err) {
+  if (err instanceof Error &amp;&amp; err.name === "AbortError") {
+    console.log("cancelado (timeout ou usuário)");
+  } else {
+    throw err;   // erro de verdade — repropaga
+  }
+}</code></pre>
+  <p>
+    Um <code>abort</code> por <code>timeout</code> chega como <code>err.name === "TimeoutError"</code>
+    em runtimes novos; um <code>abort()</code> manual sem reason chega como <code>"AbortError"</code>.
+    Trate os dois como "cancelamento", não como falha.
+  </p>
+
+  <div class="quiz" data-answer="A">
+    <p class="q">Voce passou o mesmo signal para tres fetch e chamou abort() uma vez. O que ocorre?</p>
+    <button data-opt="A">As tres requisicoes sao canceladas juntas naquele instante</button>
+    <button data-opt="B">Só a primeira requisicao para; as outras duas seguem ativas</button>
+    <button data-opt="C">Nada: um signal so pode cancelar uma unica operacao por vez</button>
+    <p class="explain" hidden>
+      <strong>A.</strong> O <code>signal</code> é um canal de broadcast. Qualquer número de
+      operações pode escutá-lo, e um <code>abort()</code> dispara o evento pra todas ao mesmo
+      tempo. É assim que você cancela um lote inteiro de chamadas com uma linha.
+    </p>
+  </div>
+
+  <h3>Prática B (15 min) — <code>pratice-04b.ts</code></h3>
+  <p><strong>Objetivo:</strong> cancelar seu próprio loop e distinguir cancelamento de erro.</p>
+  <ol>
+    <li>
+      <strong>Trabalho cancelável.</strong> <code>async function contarDevagar(signal: AbortSignal)</code>:
+      loop de <code>i = 0</code> a <code>9</code>; a cada volta <code>signal.throwIfAborted()</code>,
+      depois <code>await</code> 200&nbsp;ms, depois <code>console.log("passo", i)</code>.
+    </li>
+    <li>
+      <strong>Dispare e cancele.</strong> Numa <code>async function main()</code>: crie um
+      <code>AbortController</code>, chame <code>contarDevagar(ac.signal)</code> <em>sem</em>
+      <code>await</code> imediato (guarde a promise), agende <code>setTimeout(() =&gt; ac.abort(), 850)</code>,
+      e então <code>await</code> a promise dentro de <code>try/catch</code>.
+    </li>
+    <li>No <code>catch</code>: se <code>err.name</code> for <code>"AbortError"</code>, imprima <code>"cancelado no meio"</code>; senão <code>throw err</code>.</li>
+    <li>
+      <strong>Versão timeout.</strong> Repita, mas em vez do <code>AbortController</code> manual
+      use <code>AbortSignal.timeout(850)</code>. Observe que o <code>err.name</code> agora pode ser
+      <code>"TimeoutError"</code> — ajuste o <code>catch</code> pra aceitar os dois.
+    </li>
+  </ol>
+  <h4>Saída esperada (aproximada)</h4>
+  <pre><code>passo 0
+passo 1
+passo 2
+cancelado no meio
+--- versao timeout ---
+passo 0
+passo 1
+passo 2
+cancelado no meio</code></pre>
+  <p>
+    850&nbsp;ms dá pra ~3 passos de 200&nbsp;ms (0, 1, 2); o <code>throwIfAborted</code> na 4ª volta
+    interrompe antes do <code>console.log</code>. Lembre de chamar <code>main()</code> no fim.
+  </p>
+
+  <h3>Fontes primárias</h3>
+  <p>
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Reference/Global_Objects/Generator">MDN — Generator</a> ·
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Reference/Statements/function*">MDN — <code>function*</code></a> ·
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web/API/AbortSignal">MDN — AbortSignal</a>. ~25 min no total.
+  </p>
+
+  <div class="ask">
+    <strong>Sou seu professor — manda dúvida.</strong> Quer ver como escrever um iterador na mão
+    (sem <code>function*</code>, implementando <code>Symbol.iterator</code>), ou como
+    <code>AbortController</code> se liga a <code>EventEmitter</code> / <code>ReadableStream</code>?
+    Pergunta.
+  </div>
+
+  <div class="footer">
+    <p>
+      Anterior: <a href="0003-defensive-api-calls.html">Lição 3 — chamadas de API defensivas</a>.
+      Quando voltar: <strong>Lição 5 — Vetores, produto escalar e similaridade de cosseno</strong>
+      (a matemática de embeddings).
+    </p>
+    <p>
+      Referência: <a href="../reference/async-ts-cheatsheet.html">Colinha de Async TS</a> ·
+      <a href="../MISSION.md">Missão</a> · <a href="../roadmap.md">Roadmap</a> (Fase 0)
+    </p>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+</div>
+</body>
+</html>

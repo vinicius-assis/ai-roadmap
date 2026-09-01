@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lição 6 · Amostragem, temperature e top_p</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="0005-vectors-dot-product-cosine.html">← Lição 5</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Lição 6 · ~30 min</p>
+  <h1>Amostragem: <code>temperature</code> e <code>top_p</code></h1>
+  <p class="subtitle">O que os "botões de criatividade" da API de LLM realmente fazem com os números.</p>
+
+  <div class="why">
+    A cada token, o modelo não te devolve <em>uma</em> resposta — ele devolve uma
+    <span class="key">distribuição de probabilidade</span> sobre todo o vocabulário
+    (~100 mil tokens). Quem escolhe o próximo token a partir dessa distribuição é o
+    <span class="key">amostrador</span> (sampler), e você o controla por dois parâmetros:
+    <code>temperature</code> e <code>top_p</code>. Saber o que eles fazem é a diferença entre
+    "por que o modelo alucina/repete/fica sem graça?" ser um mistério ou um botão que você ajusta.
+    No capstone (Lição 7) você vai passar <code>temperature</code> numa chamada real.
+  </div>
+
+  <h2>1. De logits a probabilidades: <code>softmax</code></h2>
+  <p>
+    A última camada do modelo cospe um número bruto por token — o <span class="key">logit</span>.
+    Logits não são probabilidades (podem ser negativos, não somam 1). A função
+    <span class="key">softmax</span> os converte: exponencia cada um e divide pela soma.
+  </p>
+  <pre><code>p_i = exp(logit_i) / Σ_j exp(logit_j)</code></pre>
+  <p>
+    Exponenciar <em>amplifica</em> as diferenças: um logit um pouco maior vira uma
+    probabilidade bem maior. O token de maior logit sempre vira o de maior probabilidade.
+  </p>
+
+  <h2>2. <code>temperature</code>: achata ou afia a distribuição</h2>
+  <p>
+    <code>temperature</code> (T) é um divisor aplicado aos logits <em>antes</em> do softmax:
+  </p>
+  <pre><code>p_i = softmax(logit_i / T)</code></pre>
+  <p>
+    Fonte: <a href="https://huggingface.co/blog/how-to-generate">Hugging Face — <em>How to generate text</em></a>,
+    de Patrick von Platen.
+  </p>
+  <ul>
+    <li>
+      <span class="key">T &lt; 1</span> — divide por menos que 1, então <em>aumenta</em> as
+      diferenças entre logits. A distribuição fica mais <em>afiada</em>: o token mais provável
+      domina. Mais previsível, mais repetitivo.
+    </li>
+    <li>
+      <span class="key">T → 0</span> — o maior logit domina totalmente. Vira
+      <span class="key">greedy decoding</span>: sempre o token nº 1. Praticamente determinístico.
+    </li>
+    <li>
+      <span class="key">T = 1</span> — usa a distribuição exatamente como o modelo a produziu.
+    </li>
+    <li>
+      <span class="key">T &gt; 1</span> — <em>achata</em> a distribuição, dá chance a tokens
+      improváveis. Mais diverso, mas passa do ponto e vira incoerência.
+    </li>
+  </ul>
+  <div class="note">
+    <strong>Faixas variam por provedor.</strong> Na
+    <a href="https://docs.anthropic.com/en/api/messages">API da Anthropic</a>, <code>temperature</code>
+    vai de <code>0.0</code> a <code>1.0</code> (padrão <code>1.0</code>). Na OpenAI, de <code>0</code>
+    a <code>2</code> (padrão <code>1</code>). Mesmo com <code>T = 0</code> a saída
+    <em>não</em> é 100% garantida — ainda há não-determinismo de hardware/execução.
+  </div>
+
+  <h2>3. <code>top_p</code> (nucleus sampling): corta a cauda</h2>
+  <p>
+    Depois do softmax, ordene os tokens do mais provável pro menos. <code>top_p</code> mantém
+    só o <em>menor</em> conjunto do topo cuja probabilidade acumulada chega a <code>p</code>, e
+    joga fora o resto (a "cauda" de tokens improváveis). Depois renormaliza.
+  </p>
+  <pre><code>top_p = 0.9  →  vá somando p_i do maior pro menor;
+                pare quando a soma passar de 0.9;
+                amostre só entre esses tokens.</code></pre>
+  <p>
+    O truque: o tamanho do conjunto <span class="key">se adapta</span>. Quando o modelo está
+    confiante (um token com 95%), o núcleo tem 1–2 tokens. Quando está em dúvida (probabilidades
+    espalhadas), o núcleo cresce.
+    (<a href="https://huggingface.co/blog/how-to-generate">HF — nucleus sampling</a>)
+  </p>
+  <ul>
+    <li><span class="key">top_p = 1.0</span> — não corta nada (padrão).</li>
+    <li><span class="key">top_p = 0.9</span> — corte suave, remove tokens absurdos, mantém variedade.</li>
+    <li><span class="key">top_p = 0.1</span> — só a nata; quase greedy.</li>
+  </ul>
+  <div class="note">
+    <strong>Primo:</strong> <code>top_k</code> mantém os <code>k</code> tokens mais prováveis
+    (número fixo). <code>top_p</code> costuma ser melhor porque o <code>k</code> ideal muda a cada token.
+  </div>
+
+  <div class="why">
+    <strong>Regra prática (Anthropic):</strong> ajuste <code>temperature</code> <em>primeiro</em>
+    e só mexa em <code>top_p</code> se precisar de controle fino. Desde o Opus 4.1 a Anthropic
+    <em>não deixa</em> você mandar os dois na mesma chamada — os dois remodelam a mesma
+    distribuição e empilhá-los é difícil de raciocinar.
+    (<a href="https://tomarcher.io/posts/temperature-top-p-creativity-knobs/">Signal &amp; Syntax — Temperature and Top-P</a>)
+    <br><br>
+    Ponto de partida: <code>~0.0–0.3</code> pra extração/classificação/código,
+    <code>~0.7</code> pra conversa, <code>~1.0+</code> pra brainstorm/escrita criativa.
+  </div>
+
+  <h3>Mexa nos botões</h3>
+  <p>
+    Vocabulário de brinquedo com 6 tokens e seus logits. Arraste <code>temperature</code> pra
+    <code>0.3</code> — veja <code>cachorro</code> engolir tudo. Suba pra <code>1.8</code> — veja
+    <code>planilha</code> e <code>xícara</code> ganharem chance real. Volte T pra <code>1</code>
+    e baixe <code>top_p</code> pra <code>0.7</code> — veja a cauda ser cortada (riscada).
+  </p>
+  <div class="samplelab" data-tokens="cachorro:2.0, gato:1.4, filhote:0.9, ração:0.3, planilha:-1.2, xícara:-2.0"></div>
+
+  <div class="quiz" data-answer="B">
+    <p class="q">Você baixa <code>temperature</code> de <code>1.0</code> para <code>0.2</code>. O que acontece com a distribuição?</p>
+    <button data-opt="A">Ela fica mais plana e vários tokens raros passam a ser sorteados também</button>
+    <button data-opt="B">Ela fica mais afiada e o token de maior logit domina quase todo o peso</button>
+    <button data-opt="C">Ela some por completo e o modelo passa a devolver logits crus sem softmax</button>
+    <p class="explain" hidden>
+      <strong>B.</strong> <code>temperature</code> divide os logits antes do softmax. Dividir por
+      <code>0.2</code> multiplica as diferenças por 5 — o maior logit fica muito à frente e o
+      softmax concentra o peso nele. <code>T → 0</code> é o limite: greedy, sempre o token nº 1.
+    </p>
+  </div>
+
+  <div class="quiz" data-answer="A">
+    <p class="q">Num passo, um token tem <code>0.95</code> de probabilidade. Com <code>top_p = 0.9</code>, quantos tokens entram no sorteio?</p>
+    <button data-opt="A">Apenas um, porque ele sozinho já passa do limite de nove décimos</button>
+    <button data-opt="B">Todos eles, porque top_p só corta quando nenhum token passa de meio</button>
+    <button data-opt="C">Cerca de nove, porque top_p sempre mantém uma fração fixa da lista</button>
+    <p class="explain" hidden>
+      <strong>A.</strong> <code>top_p</code> soma as probabilidades do maior pro menor e para
+      quando passa de <code>p</code>. Se o primeiro token já tem <code>0.95 ≥ 0.9</code>, o núcleo
+      é só ele. É isso que torna o <code>top_p</code> adaptativo: núcleo pequeno quando o modelo
+      está confiante, grande quando está em dúvida.
+    </p>
+  </div>
+
+  <div class="note">
+    <strong>Revisão espaçada (Lição 5):</strong> <code>a = [1, 0]</code>, <code>b = [0, 5]</code>.
+    Similaridade de cosseno? — <code>a · b = 0</code>, então <code>cos = 0</code>: perpendiculares,
+    sem relação. O comprimento <code>5</code> de <code>b</code> não muda nada — é justamente o que
+    a divisão pelas normas remove.
+  </div>
+
+  <h2>Sua vitória de hoje</h2>
+  <ul>
+    <li>explicar <code>softmax</code> e por que exponenciar amplifica diferenças;</li>
+    <li>dizer, sem hesitar, o que <code>T&lt;1</code>, <code>T=1</code> e <code>T&gt;1</code> fazem;</li>
+    <li>explicar por que <code>top_p</code> é um corte <em>adaptativo</em> da cauda;</li>
+    <li>implementar <code>softmax</code> com temperatura em TS e ver a distribuição mudar.</li>
+  </ul>
+
+  <h3>Prática (20 min) — <code>pratice-06.ts</code></h3>
+  <p>
+    <strong>Objetivo:</strong> implementar o pipeline de amostragem — de logits crus até o token
+    sorteado — e observar no terminal o efeito da <code>temperature</code>. É exatamente o que
+    roda dentro do servidor do modelo a cada token.
+  </p>
+  <ol>
+    <li>
+      <strong><code>softmax</code>.</strong>
+      <code>function softmax(logits: number[], T: number): number[]</code> — divida cada logit por
+      <code>T</code>, exponencie (<code>Math.exp</code>), divida pela soma. O array de saída deve
+      somar <code>1</code>.
+      <br><span class="key">Conceito:</span> subtraia <code>Math.max(...scaled)</code> de cada
+      valor antes do <code>exp</code> — resultado idêntico, mas evita <code>Infinity</code> com
+      logits grandes. (É o único "truque" aqui; o resto é a fórmula direta.)
+    </li>
+    <li>
+      <strong><code>sample</code>.</strong>
+      <code>function sample(probs: number[]): number</code> — sorteie um índice <em>respeitando</em>
+      as probabilidades. Padrão "roleta": <code>const r = Math.random()</code>, vá somando
+      <code>probs[i]</code> num acumulador e retorne <code>i</code> no passo em que o acumulador
+      passa de <code>r</code>.
+    </li>
+    <li>
+      <strong>Observe a temperatura.</strong> Dado
+      <pre><code>const vocab  = ["cachorro", "gato", "filhote", "ração", "planilha"];
+const logits = [2.0, 1.4, 0.9, 0.3, -1.2];</code></pre>
+      Para cada <code>T</code> em <code>[0.2, 0.7, 1.0, 1.8]</code>: imprima as probabilidades
+      (2 casas, <code>%</code>) e depois sorteie <strong>1000 vezes</strong> com <code>sample</code>,
+      imprimindo a contagem por token. As contagens devem seguir de perto as probabilidades.
+    </li>
+    <li>
+      <strong>(Opcional) <code>topP</code>.</strong>
+      <code>function topP(probs: number[], p: number): number[]</code> — zere os tokens fora do
+      núcleo e renormalize o resto pra somar <code>1</code>. Rode o teste de 1000 sorteios com
+      <code>T=1</code> e <code>p=0.8</code> e confirme que os tokens da cauda saem <code>0</code> vezes.
+    </li>
+  </ol>
+
+  <h3>Saída esperada (aproximada)</h3>
+  <pre><code>T=0.2  cachorro 94.9%  gato 4.7%  filhote 0.4%  ração 0.0%  planilha 0.0%
+       sorteios: { cachorro: 949, gato: 47, filhote: 4, ração: 0, planilha: 0 }
+
+T=1.0  cachorro 47.6%  gato 26.1%  filhote 15.8%  ração 8.7%  planilha 1.9%
+       sorteios: { cachorro: 470, gato: 265, filhote: 152, ração: 92, planilha: 21 }
+
+T=1.8  cachorro 34%    gato 25%    filhote 19%    ração 14%   planilha 7%</code></pre>
+  <p>
+    Os números exatos podem variar um pouco (e os sorteios mudam a cada execução — é
+    aleatório). O que importa: a distribuição <em>concentra</em> quando <code>T</code> cai e
+    <em>espalha</em> quando sobe, e as contagens seguem as probabilidades. Lembre de chamar
+    <code>main()</code> no fim. Rode com <code>npx tsx pratice-06.ts</code> e me mande.
+  </p>
+
+  <h3>Fonte primária</h3>
+  <p>
+    <a href="https://huggingface.co/blog/how-to-generate">Hugging Face — <em>How to generate text with Transformers</em></a>
+    (Patrick von Platen, ~20 min de leitura): greedy, beam search, <code>top_k</code> e
+    <code>top_p</code> com gráficos. Leia as seções <em>Sampling</em>, <em>Top-K</em> e <em>Top-p</em>.
+    Complemente com a
+    <a href="https://docs.anthropic.com/en/api/messages">referência da API Messages da Anthropic</a>
+    (campos <code>temperature</code> e <code>top_p</code>).
+  </p>
+
+  <div class="ask">
+    <strong>Sou seu professor — manda dúvida.</strong> Quer entender por que
+    <code>temperature = 0</code> ainda não é 100% determinístico, o que são
+    <code>frequency_penalty</code> / <code>presence_penalty</code>, ou por que loops de repetição
+    ("the the the") acontecem e como o sampler os combate? Pergunta.
+  </div>
+
+  <div class="footer">
+    <p>
+      Anterior: <a href="0005-vectors-dot-product-cosine.html">Lição 5 — vetores e cosseno</a>.
+      Próxima: <strong>Lição 7 — Capstone</strong>: um script TS que faz streaming de tokens de
+      uma API de modelo real (junta async + streaming + <code>temperature</code>).
+    </p>
+    <p>
+      Referência: <a href="../reference/sampling-cheatsheet.html">Colinha de Amostragem</a> ·
+      <a href="../reference/vectors-cheatsheet.html">Colinha de Vetores</a> ·
+      <a href="../reference/async-ts-cheatsheet.html">Colinha de Async TS</a> ·
+      <a href="../MISSION.md">Missão</a>
+    </p>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+  <script src="../assets/sampling-lab.js"></script>
+</div>
+</body>
+</html>

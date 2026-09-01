@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Referência · Colinha de Async TypeScript</title>
+  <link rel="stylesheet" href="../assets/course.css">
+  <style>
+    :root { --maxw: 46rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.9rem; }
+    th, td { border: 1px solid var(--rule); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--note-bg); font-family: system-ui, sans-serif; }
+    td code { font-size: 0.82em; }
+  </style>
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Referência</p>
+  <h1>Colinha de Async TypeScript</h1>
+  <p class="subtitle">O essencial comprimido. Imprima. Revise antes de cada lição de async.</p>
+
+  <h2>Modelo central</h2>
+  <ul>
+    <li>Uma função async <span class="key">sempre retorna <code>Promise&lt;T&gt;</code></span>. <code>return x</code> resolve; <code>throw e</code> rejeita.</li>
+    <li><code>await p</code> suspende <em>somente a função atual</em> até <code>p</code> se resolver; o event loop continua rodando.</li>
+    <li>Chamar uma função async a executa de forma síncrona até o primeiro <code>await</code>, e então devolve o controle para quem chamou.</li>
+    <li><code>await</code> numa Promise rejeitada <span class="key">lança</span> um erro naquela linha — capture com <code>try/catch</code>.</li>
+  </ul>
+
+  <h2>Mapa de sintaxe</h2>
+  <table>
+    <tr><th>Forma com Promise</th><th>Forma com async/await</th></tr>
+    <tr><td><code>p.then(v =&gt; …)</code></td><td><code>const v = await p</code></td></tr>
+    <tr><td><code>p.catch(e =&gt; …)</code></td><td><code>try { … } catch (e) { … }</code></td></tr>
+    <tr><td><code>p.finally(() =&gt; …)</code></td><td><code>try { … } finally { … }</code></td></tr>
+    <tr><td><code>Promise.all([a, b])</code></td><td><code>const [x, y] = await Promise.all([a, b])</code></td></tr>
+  </table>
+
+  <h2>Padrões</h2>
+  <pre><code>// Função async tipada
+async function fetchJson&lt;T&gt;(url: string): Promise&lt;T&gt; {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise&lt;T&gt;;
+}
+
+// Trabalho paralelo e independente
+const [a, b] = await Promise.all([tarefaA(), tarefaB()]);
+
+// Paralelo, quer todos os resultados mesmo se algum falhar
+const results = await Promise.allSettled([tarefaA(), tarefaB()]);
+// results[i].status === "fulfilled" | "rejected"
+
+// Sequencial — SÓ quando o passo N precisa do passo N-1
+let acc = seed;
+for (const step of steps) acc = await step(acc);
+
+// Dormir
+const sleep = (ms: number) =&gt; new Promise&lt;void&gt;(r =&gt; setTimeout(r, ms));
+
+// Timeout / cancelamento (Lição 3)
+const ac = new AbortController();
+const timer = setTimeout(() =&gt; ac.abort(), 5000);
+try { return await fetch(url, { signal: ac.signal }); }
+finally { clearTimeout(timer); }   // limpa o timer nos dois caminhos
+
+// Generator — protocolo (Lição 4)
+function* g() { yield 1; yield 2; return 9; }
+const it = g();
+it.next();          // { value: 1, done: false }  — roda até o yield
+it.next();          // { value: 2, done: false }
+it.next();          // { value: 9, done: true }    — o return
+// gen() NÃO roda o corpo; só cria o iterador (lazy).
+// .next(x) injeta x como valor do `yield` que retomou.
+// yield* outroIteravel  → delega.
+
+// AbortController — a fundo (Lição 4)
+const ac = new AbortController();
+ac.signal;                       // passe para 1+ operações (fetch etc.)
+ac.abort(reason?);               // cancela todas de uma vez
+ac.signal.aborted;               // boolean
+ac.signal.throwIfAborted();      // cheque dentro do seu próprio loop
+AbortSignal.timeout(5000);       // timeout nativo, sem setTimeout manual
+AbortSignal.any([s1, s2]);       // cancela se qualquer um cancelar
+// no catch: err.name === "AbortError" | "TimeoutError" → é cancelamento, não falha
+
+// Retry com backoff exponencial + jitter (Lição 3)
+const base = 1000 * 2 ** tentativa;          // 1000, 2000, 4000...
+const espera = base + Math.random() * base;  // + jitter, espalha o "herd"
+// retry só em 429 e 5xx / rede / timeout. 4xx (400/401/404/422) NÃO.
+// 429 → respeite o header Retry-After se vier.
+
+// Criar um iterável assíncrono (Lição 2)
+async function* stream(): AsyncGenerator&lt;string&gt; {
+  for (const p of ["Oi", " ", "mundo"]) {
+    await sleep(200);
+    yield p;               // entrega um chunk, pausa até pedirem o próximo
+  }
+}
+
+// Consumir um stream de tokens (Lição 2)
+let completo = "";
+for await (const chunk of stream()) {   // await implícito a cada volta
+  completo += chunk;
+  process.stdout.write(chunk);
+}</code></pre>
+
+  <h2>Armadilhas</h2>
+  <table>
+    <tr><th>Armadilha</th><th>Correção</th></tr>
+    <tr><td><code>arr.forEach(async …)</code> — não espera</td><td>Use <code>for…of</code> com <code>await</code>, ou <code>Promise.all(arr.map(async …))</code></td></tr>
+    <tr><td><code>await</code> sequencial para chamadas independentes — 2× de latência</td><td><code>Promise.all</code></td></tr>
+    <tr><td>Erro async que ninguém espera → unhandled rejection</td><td>Sempre termine a cadeia com <code>await</code> + <code>try/catch</code> ou <code>.catch()</code></td></tr>
+    <tr><td>Esquecer o <code>await</code> → você recebe uma <code>Promise</code>, não o valor</td><td>O TS costuma avisar; ative <code>@typescript-eslint/no-floating-promises</code></td></tr>
+    <tr><td><code>await</code> dentro de função não-async → erro de sintaxe</td><td>Marque a função como <code>async</code>, ou use top-level <code>await</code> num módulo ES</td></tr>
+  </table>
+
+  <div class="footer">
+    <p>
+      Lições que usam isto: <a href="../lessons/0001-async-await-mental-model.html">1 — modelo mental de async/await</a>,
+      <a href="../lessons/0002-async-iterators-streaming.html">2 — iteradores assíncronos e streaming</a>,
+      <a href="../lessons/0003-defensive-api-calls.html">3 — chamadas de API defensivas</a>,
+      <a href="../lessons/0004-deep-dive-generators-abortcontroller.html">4 — deep dive: generators e AbortController</a>.
+      · <a href="../MISSION.md">Missão</a>
+    </p>
+    <p>Fonte primária: <a href="https://developer.mozilla.org/pt-BR/docs/Web/JavaScript/Guide/Using_promises">MDN — Usando promises</a>.</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lição 3 · Chamadas de API defensivas</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="0002-async-iterators-streaming.html">← Lição 2</a>
+    <a class="nav-btn" href="0004-deep-dive-generators-abortcontroller.html">Lição 4 →</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Lição 3 · ~30 min</p>
+  <h1>Chamadas de API que não quebram em produção</h1>
+  <p class="subtitle">Timeout com <code>AbortController</code>, retry com backoff + jitter, e o <code>429</code>.</p>
+
+  <div class="why">
+    APIs de LLM falham o tempo todo de formas <em>temporárias</em>: a rede engasga, o provedor
+    devolve <code>529 Overloaded</code>, ou você bate no rate limit e leva um <code>429</code>.
+    Nenhuma dessas é motivo pra derrubar seu programa — quase sempre a mesma requisição funciona
+    se você esperar um pouco e tentar de novo. Esta lição é o padrão que você vai copiar pra
+    dentro de todo projeto do roadmap.
+  </div>
+
+  <h2>1. Timeout: uma requisição não pode esperar pra sempre</h2>
+  <p>
+    <code>fetch</code> não tem timeout embutido. Se o servidor simplesmente não responde, sua
+    <code>Promise</code> fica pendente indefinidamente. A solução é o
+    <span class="key"><code>AbortController</code></span>: um objeto com um <code>signal</code> que
+    você passa pro <code>fetch</code> e um <code>.abort()</code> que cancela a requisição.
+  </p>
+  <pre><code>async function fetchComTimeout(url: string, ms: number): Promise&lt;Response&gt; {
+  const ac = new AbortController();
+  const timer = setTimeout(() =&gt; ac.abort(), ms);
+  try {
+    return await fetch(url, { signal: ac.signal });
+  } finally {
+    clearTimeout(timer);   // sempre limpa, deu certo ou não
+  }
+}</code></pre>
+  <p>
+    Quando <code>.abort()</code> dispara, o <code>fetch</code> rejeita com um erro de nome
+    <code>"AbortError"</code>. O <code>clearTimeout</code> no <code>finally</code> evita deixar um
+    timer pendurado quando a resposta chega antes do prazo.
+    (<a href="https://developer.mozilla.org/pt-BR/docs/Web/API/AbortController">MDN: <code>AbortController</code></a>)
+  </p>
+
+  <div class="quiz" data-answer="C">
+    <p class="q">Por que o clearTimeout precisa estar no bloco finally?</p>
+    <button data-opt="A">Porque o finally roda antes do fetch, cancelando cedo o timer</button>
+    <button data-opt="B">Porque sem ele o AbortController nunca chega a disparar abort</button>
+    <button data-opt="C">Porque o timer deve ser limpo mesmo quando o fetch da certo</button>
+    <p class="explain" hidden>
+      <strong>C.</strong> Se a resposta chega em 300ms mas o timeout era 5000ms, aquele
+      <code>setTimeout</code> ainda está agendado. Sem <code>clearTimeout</code> ele dispara depois,
+      chamando <code>abort()</code> à toa e mantendo o processo vivo por mais tempo. O
+      <code>finally</code> garante a limpeza nos dois caminhos — sucesso e erro.
+    </p>
+  </div>
+
+  <h2>2. Retry: tente de novo, mas com paciência crescente</h2>
+  <p>
+    Falha temporária → espere → tente de novo. O truque é <span class="key">quanto</span> esperar.
+    Repetir na hora, várias vezes, só piora um servidor já sobrecarregado (todo mundo batendo ao
+    mesmo tempo). A resposta é <span class="key">backoff exponencial</span>: dobre a espera a cada
+    tentativa.
+  </p>
+  <pre><code>tentativa 1 falhou → espera ~1s
+tentativa 2 falhou → espera ~2s
+tentativa 3 falhou → espera ~4s
+tentativa 4 falhou → desiste, propaga o erro</code></pre>
+
+  <h3>Jitter: um tempero aleatório</h3>
+  <p>
+    Se 1000 clientes falham no mesmo segundo e todos esperam exatamente 1s, eles voltam
+    exatamente juntos — e derrubam o servidor de novo (o "thundering herd"). Adicione um
+    <span class="key">jitter</span>: uma fração aleatória em cima da espera, pra espalhar as
+    tentativas no tempo.
+  </p>
+  <pre><code>const base = 1000 * 2 ** tentativa;      // 1000, 2000, 4000...
+const espera = base + Math.random() * base; // + 0 a 100% aleatório
+await new Promise((r) =&gt; setTimeout(r, espera));</code></pre>
+  <blockquote>
+    "Retry com backoff exponencial e jitter é o padrão de fato para lidar com sobrecarga."
+    — <a href="https://sre.google/sre-book/handling-overload/">Google SRE Book, Handling Overload</a>
+  </blockquote>
+
+  <h2>3. Nem todo erro merece retry</h2>
+  <p>Antes de repetir, olhe <em>o que</em> falhou:</p>
+  <table style="border-collapse:collapse;width:100%;margin:1.2rem 0;font-size:0.9rem;">
+    <tr style="background:var(--note-bg);font-family:system-ui,sans-serif;">
+      <th style="border:1px solid var(--rule);padding:0.5rem;text-align:left;">Situação</th>
+      <th style="border:1px solid var(--rule);padding:0.5rem;text-align:left;">Retry?</th>
+    </tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>429 Too Many Requests</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">Sim — respeitando o header <code>Retry-After</code></td></tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>500 / 502 / 503 / 529</code>, erro de rede, timeout</td><td style="border:1px solid var(--rule);padding:0.5rem;">Sim — backoff + jitter</td></tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>400 Bad Request</code>, <code>401</code>, <code>404</code>, <code>422</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">Não — seu pedido está errado, repetir não muda nada</td></tr>
+  </table>
+  <div class="note">
+    <strong><code>429</code> e o header <code>Retry-After</code>:</strong> quando o provedor te
+    limita, a resposta muitas vezes traz <code>Retry-After: 12</code> (segundos) ou uma data.
+    Isso é o servidor te dizendo <em>exatamente</em> quanto esperar — obedeça em vez de chutar
+    com o backoff. <code>const s = res.headers.get("retry-after")</code>.
+  </div>
+
+  <h2>4. O padrão completo, montado</h2>
+  <pre><code>async function chamarComRetry(
+  url: string,
+  opts: RequestInit = {},
+  maxTentativas = 4,
+): Promise&lt;Response&gt; {
+  for (let tentativa = 0; tentativa &lt; maxTentativas; tentativa++) {
+    try {
+      const res = await fetchComTimeout(url, 10_000);
+
+      if (res.ok) return res;                       // 2xx — pronto
+      if (res.status &lt; 500 &amp;&amp; res.status !== 429)   // 4xx "culpa sua"
+        throw new Error(`erro permanente: ${res.status}`);
+
+      // 429 ou 5xx — cai pro retry abaixo
+      const retryAfter = Number(res.headers.get("retry-after")) || 0;
+      await esperar(retryAfter * 1000 || backoff(tentativa));
+    } catch (err) {
+      if ((err as Error).name !== "AbortError" &amp;&amp; !ehTemporario(err)) throw err;
+      if (tentativa === maxTentativas - 1) throw err;  // última: desiste
+      await esperar(backoff(tentativa));
+    }
+  }
+  throw new Error("esgotou as tentativas");
+}</code></pre>
+  <p>
+    Você não precisa decorar isto — precisa reconhecer as peças: <em>loop de tentativas</em>,
+    <em>classificar o erro</em>, <em>esperar com backoff/jitter ou <code>Retry-After</code></em>,
+    <em>desistir na última</em>. Bibliotecas como <code>p-retry</code> empacotam isso, mas os SDKs
+    oficiais da OpenAI e Anthropic já fazem retry sozinhos — o valor aqui é entender o que eles
+    estão fazendo por baixo.
+  </p>
+
+  <div class="quiz" data-answer="B">
+    <p class="q">Chega um 400 Bad Request. Qual a acao correta?</p>
+    <button data-opt="A">Retry com backoff, pois todo erro 4xx costuma ser temporario</button>
+    <button data-opt="B">Nao repetir: propagar o erro, pois a requisicao esta malformada</button>
+    <button data-opt="C">Repetir uma vez sem espera e so entao propagar caso falhe</button>
+    <p class="explain" hidden>
+      <strong>B.</strong> <code>400</code> significa que o servidor entendeu o pedido e ele está
+      errado — JSON inválido, parâmetro faltando. Mandar de novo, igual, dá <code>400</code> de
+      novo. Só <code>429</code> e <code>5xx</code> (mais rede/timeout) merecem retry.
+    </p>
+  </div>
+
+  <h2>Sua vitória de hoje</h2>
+  <ul>
+    <li>dar timeout numa requisição com <code>AbortController</code>;</li>
+    <li>implementar retry com backoff exponencial + jitter;</li>
+    <li>decidir quais erros merecem retry e respeitar <code>Retry-After</code>.</li>
+  </ul>
+
+  <h3>Prática (20 min)</h3>
+  <p>
+    <strong>Objetivo:</strong> escrever <code>chamarComRetry</code> contra um servidor falso que
+    falha as primeiras vezes e depois responde, e ver o backoff no log.
+  </p>
+  <ol>
+    <li>
+      <strong>Servidor falso.</strong> <code>let chamadas = 0</code>. Função
+      <code>async function apiFalsa(): Promise&lt;{ status: number }&gt;</code> que faz
+      <code>chamadas++</code> e retorna <code>{ status: 503 }</code> nas 2 primeiras chamadas,
+      <code>{ status: 200 }</code> da 3ª em diante.
+    </li>
+    <li>
+      <strong>backoff.</strong> <code>function backoff(tentativa: number): number</code> →
+      <code>const base = 100 * 2 ** tentativa</code> (100, 200, 400&hellip; — ms curtos pra
+      testar rápido), retorne <code>base + Math.random() * base</code>.
+    </li>
+    <li>
+      <strong>Loop de retry.</strong> <code>async function chamarComRetry(maxTentativas = 5)</code>.
+      Em cada volta: chame <code>apiFalsa()</code>; se <code>status === 200</code>, imprima
+      <code>"ok na tentativa", tentativa</code> e <code>return</code>; senão imprima
+      <code>"tentativa", tentativa, "falhou (", status, ") esperando", ms</code> e
+      <code>await</code> o <code>backoff</code>. Se estourar <code>maxTentativas</code>,
+      <code>throw new Error("esgotou")</code>.
+    </li>
+    <li>
+      <strong>Caso permanente.</strong> Mude <code>apiFalsa</code> pra retornar
+      <code>{ status: 400 }</code> sempre. No loop, trate: se <code>status</code> for
+      <code>&gt;= 400 &amp;&amp; &lt; 500 &amp;&amp; !== 429</code>, <code>throw</code> na hora sem retry.
+      Chame dentro de um <code>try/catch</code> e imprima a mensagem.
+    </li>
+  </ol>
+
+  <h3>Saída esperada (aproximada)</h3>
+  <pre><code># passos 1-3:
+tentativa 0 falhou ( 503 ) esperando 143 ms
+tentativa 1 falhou ( 503 ) esperando 271 ms
+ok na tentativa 2
+
+# passo 4 (status 400 sempre):
+erro permanente, sem retry: 400</code></pre>
+  <p>Os ms do backoff variam (100&ndash;200, 200&ndash;400&hellip;) por causa do jitter — a ordem de grandeza é o que importa.</p>
+  <p>Rode com <code>npx tsx pratice-03.ts</code> e me mande.</p>
+
+  <h3>Fonte primária</h3>
+  <p>
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web/API/AbortController">MDN — AbortController</a>
+    e <a href="https://sre.google/sre-book/handling-overload/">Google SRE Book — Handling Overload</a>
+    (seção final, sobre retries). ~20 min.
+  </p>
+
+  <div class="ask">
+    <strong>Sou seu professor — manda dúvida.</strong> Quer ver como o SDK da Anthropic expõe
+    <code>maxRetries</code>, o que é um circuit breaker, ou como isso interage com streaming
+    (retry no meio de um stream é mais complicado)? Pergunta.
+  </div>
+
+  <div class="footer">
+    <p>
+      Anterior: <a href="0002-async-iterators-streaming.html">Lição 2 — iteradores assíncronos</a>.
+      Próxima: <strong>Lição 4 — Vetores, produto escalar e similaridade de cosseno</strong>:
+      a matemática por trás de embeddings e busca semântica. Fim do bloco de async.
+    </p>
+    <p>
+      Referência: <a href="../reference/async-ts-cheatsheet.html">Colinha de Async TS</a> ·
+      <a href="../MISSION.md">Missão</a> · <a href="../roadmap.md">Roadmap</a> (Fase 0)
+    </p>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+</div>
+</body>
+</html>

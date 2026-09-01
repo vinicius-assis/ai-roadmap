@@ -12,7 +12,6 @@
 
 - **Async em TS**: Promises, `async/await`, streaming (SSE) — SDKs de LLM usam muito stream de tokens
 - **APIs REST**: retry, tratamento de erro, rate limit
-- **Git/GitHub**
 - **Matemática mínima**: vetores/produto escalar (embeddings), noções de probabilidade
 
 ---

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lição 5 · Vetores, produto escalar e cosseno</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="0004-deep-dive-generators-abortcontroller.html">← Lição 4</a>
+    <a class="nav-btn" href="0006-probability-sampling-temperature-topp.html">Lição 6 →</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Lição 5 · ~30 min</p>
+  <h1>Vetores, produto escalar e similaridade de cosseno</h1>
+  <p class="subtitle">A matemática que faz a busca semântica funcionar — à mão e em TypeScript.</p>
+
+  <div class="why">
+    Um <span class="key">embedding</span> é um vetor: uma lista de números que a rede neural
+    escolheu pra representar o <em>significado</em> de um texto. "cachorro" e "cão" viram vetores
+    quase iguais; "cachorro" e "planilha" viram vetores bem diferentes. Todo sistema de RAG e
+    busca semântica que você vai construir nas próximas fases faz a mesma pergunta milhares de
+    vezes: <em>quão parecidos são estes dois vetores?</em> A resposta é a
+    <span class="key">similaridade de cosseno</span>, e ela é feita de duas peças: o
+    <span class="key">produto escalar</span> e a <span class="key">norma</span>.
+  </div>
+
+  <h2>1. Um vetor é uma direção no espaço</h2>
+  <p>
+    Esqueça "seta na aula de física" por um segundo. Para nós, um vetor é só um
+    <code>number[]</code>: <code>[0.2, -1.3, 0.8]</code>. Cada número é uma coordenada em um eixo.
+    Com 2 números você aponta pra algum lugar num plano; com 3, num espaço; os embeddings da
+    OpenAI têm <span class="key">1536</span> números — 1536 eixos, impossível de desenhar, mas a
+    matemática é idêntica à de 2D.
+  </p>
+  <p>
+    Duas coisas nos interessam num vetor: pra <em>onde</em> ele aponta (direção) e
+    <em>quão longe</em> ele vai (comprimento). Para significado, só a direção importa.
+  </p>
+
+  <h2>2. Produto escalar: <code>a · b</code></h2>
+  <p>
+    Multiplique os vetores componente a componente e some tudo. É um número só (um "escalar",
+    daí o nome).
+  </p>
+  <pre><code>a = [1, 2, 2]
+b = [2, 0, 1]
+
+a · b = (1·2) + (2·0) + (2·1) = 2 + 0 + 2 = 4</code></pre>
+  <p>
+    Intuição: o produto escalar é grande e positivo quando os dois vetores apontam pro
+    <em>mesmo lado</em>, perto de zero quando são <span class="key">perpendiculares</span> (nada a
+    ver um com o outro), e negativo quando apontam pra lados opostos.
+    (<a href="https://www.3blue1brown.com/lessons/dot-products">3Blue1Brown — Dot products</a>)
+  </p>
+  <p>
+    Mas o produto escalar sozinho tem um defeito: ele também cresce quando os vetores ficam
+    <em>mais compridos</em>, não só mais alinhados. Precisamos tirar o comprimento da conta.
+  </p>
+
+  <h2>3. Norma: o comprimento de um vetor</h2>
+  <p>
+    A <span class="key">norma</span> (ou magnitude) <code>‖a‖</code> é o comprimento do vetor —
+    Pitágoras em N dimensões: eleve cada componente ao quadrado, some, tire a raiz.
+  </p>
+  <pre><code>‖a‖ = √(1² + 2² + 2²) = √9 = 3
+‖b‖ = √(2² + 0² + 1²) = √5 ≈ 2.236</code></pre>
+
+  <h2>4. Similaridade de cosseno: produto escalar <em>normalizado</em></h2>
+  <p>
+    Divida o produto escalar pelos dois comprimentos. O resultado é o
+    <span class="key">cosseno do ângulo</span> entre os vetores — puro alinhamento, sem influência
+    do tamanho.
+  </p>
+  <pre><code>cos(a, b) = (a · b) / (‖a‖ · ‖b‖)
+          = 4 / (3 · 2.236)
+          ≈ 0.596</code></pre>
+  <p>
+    Fonte: <a href="https://en.wikipedia.org/wiki/Cosine_similarity">Wikipedia — Cosine similarity</a>:
+    <em>"é o produto escalar dos vetores dividido pelo produto dos seus comprimentos."</em>
+  </p>
+  <table style="border-collapse:collapse;width:100%;margin:1.2rem 0;font-size:0.9rem;">
+    <tr style="background:var(--note-bg);font-family:system-ui,sans-serif;">
+      <th style="border:1px solid var(--rule);padding:0.5rem;text-align:left;">cos(a, b)</th>
+      <th style="border:1px solid var(--rule);padding:0.5rem;text-align:left;">Ângulo</th>
+      <th style="border:1px solid var(--rule);padding:0.5rem;text-align:left;">Significado</th>
+    </tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>+1</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">0°</td><td style="border:1px solid var(--rule);padding:0.5rem;">mesma direção — sentido praticamente idêntico</td></tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>0</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">90°</td><td style="border:1px solid var(--rule);padding:0.5rem;">perpendiculares — sem relação</td></tr>
+    <tr><td style="border:1px solid var(--rule);padding:0.5rem;"><code>−1</code></td><td style="border:1px solid var(--rule);padding:0.5rem;">180°</td><td style="border:1px solid var(--rule);padding:0.5rem;">opostos</td></tr>
+  </table>
+  <div class="note">
+    <strong>Na prática:</strong> embeddings de texto quase nunca dão negativo. Os valores úteis
+    ficam tipicamente entre <code>~0.7</code> (frouxamente relacionados) e <code>~0.95</code>
+    (praticamente o mesmo assunto). Você ordena candidatos por cosseno e pega os
+    <span class="key">top-k</span>.
+  </div>
+
+  <div class="why">
+    <strong>Atalho que os provedores te dão:</strong> a OpenAI e a maioria dos modelos devolvem
+    embeddings já <span class="key">normalizados</span> (<code>‖v‖ = 1</code>). Quando os dois
+    vetores têm comprimento 1, o denominador vira <code>1 · 1</code> e a similaridade de cosseno
+    <em>é</em> só o produto escalar. Por isso bancos vetoriais falam em "inner product" e
+    "cosine" quase como sinônimos — pra vetores unitários, são a mesma coisa.
+  </div>
+
+  <h3>Confira sua conta</h3>
+  <p>Digite vetores e veja cada passo. Comece com <code>a = 1,2,2</code> e <code>b = 2,0,1</code>
+    (deve bater com a lição). Depois teste <code>a = 3,0</code> e <code>b = 30,0</code> — mesmo
+    cosseno (<code>1</code>) apesar de comprimentos bem diferentes.</p>
+  <div class="veclab" data-a="1, 2, 2" data-b="2, 0, 1"></div>
+
+  <div class="quiz" data-answer="B">
+    <p class="q">Por que dividir o produto escalar pelas duas normas dos vetores?</p>
+    <button data-opt="A">Para deixar o resultado sempre positivo e nunca abaixo de zero real</button>
+    <button data-opt="B">Para medir só o alinhamento e remover o efeito do comprimento deles</button>
+    <button data-opt="C">Para acelerar o cálculo evitando a raiz quadrada de cada norma ali</button>
+    <p class="explain" hidden>
+      <strong>B.</strong> O produto escalar cru aumenta tanto quando os vetores se alinham quanto
+      quando ficam mais compridos. Dividir por <code>‖a‖·‖b‖</code> cancela o comprimento e sobra
+      o cosseno do ângulo — alinhamento puro, de <code>−1</code> a <code>+1</code>.
+    </p>
+  </div>
+
+  <div class="quiz" data-answer="A">
+    <p class="q">Os embeddings já vêm normalizados. O que a similaridade de cosseno vira?</p>
+    <button data-opt="A">O próprio produto escalar dos dois vetores, sem dividir por mais nada</button>
+    <button data-opt="B">A distância euclidiana entre as pontas dos dois vetores no espaço</button>
+    <button data-opt="C">A soma de todos os componentes de cada um dos vetores multiplicados</button>
+    <p class="explain" hidden>
+      <strong>A.</strong> Normalizado quer dizer <code>‖v‖ = 1</code>. O denominador
+      <code>‖a‖·‖b‖</code> vira <code>1·1 = 1</code>, então <code>cos(a,b) = a · b</code>.
+      Cálculo mais barato — por isso os provedores normalizam pra você.
+    </p>
+  </div>
+
+  <div class="note">
+    <strong>Revisão espaçada (Lição 3/4):</strong> num loop de <code>retry</code>, chega um
+    <code>404</code>. Você repete com backoff? — <em>Não</em>: <code>4xx</code> (fora do
+    <code>429</code>) é erro permanente, repetir dá o mesmo <code>404</code>. Só <code>429</code>
+    e <code>5xx</code> + rede/timeout merecem retry.
+  </div>
+
+  <h2>Sua vitória de hoje</h2>
+  <ul>
+    <li>calcular um produto escalar e uma norma à mão;</li>
+    <li>montar a similaridade de cosseno a partir dessas duas peças;</li>
+    <li>explicar por que é <em>cosseno</em> e não produto escalar cru — e quando dá na mesma;</li>
+    <li>implementar as três funções em TypeScript e ranquear textos por similaridade.</li>
+  </ul>
+
+  <h3>Prática (20 min) — <code>pratice-05.ts</code></h3>
+  <p>
+    <strong>Objetivo:</strong> implementar a similaridade de cosseno e usá-la pra achar, dado um
+    vetor de consulta, qual "documento" é o mais parecido — o coração de um retriever de RAG.
+  </p>
+  <ol>
+    <li>
+      <strong><code>dot</code>.</strong> <code>function dot(a: number[], b: number[]): number</code>
+      — some <code>a[i] * b[i]</code>. (Assuma mesmo tamanho.)
+    </li>
+    <li>
+      <strong><code>norm</code>.</strong> <code>function norm(v: number[]): number</code> —
+      <code>Math.sqrt</code> da soma dos quadrados. Dica: <code>dot(v, v)</code> já é a soma dos
+      quadrados.
+    </li>
+    <li>
+      <strong><code>cosine</code>.</strong>
+      <code>function cosine(a: number[], b: number[]): number</code> —
+      <code>dot(a, b) / (norm(a) * norm(b))</code>.
+    </li>
+    <li>
+      <strong>Ranquear.</strong> Dado um array de docs e uma consulta:
+      <pre><code>const docs = [
+  { texto: "como treinar um cachorro filhote", v: [0.9, 0.1, 0.0] },
+  { texto: "receita de bolo de cenoura",       v: [0.0, 0.2, 0.9] },
+  { texto: "adestramento canino para iniciantes", v: [0.8, 0.2, 0.1] },
+];
+const consulta = [0.85, 0.15, 0.05];</code></pre>
+      Calcule o cosseno da <code>consulta</code> contra cada <code>doc.v</code>, ordene do maior
+      pro menor e imprima <code>texto</code> + score (3 casas).
+    </li>
+    <li>
+      <strong>Confirme o atalho.</strong> Escreva <code>function unit(v)</code> que divide cada
+      componente por <code>norm(v)</code>. Normalize <code>consulta</code> e todos os
+      <code>doc.v</code>, e verifique que <code>dot(unit(a), unit(b))</code> dá (quase) o mesmo
+      que <code>cosine(a, b)</code>.
+    </li>
+  </ol>
+
+  <h3>Saída esperada (aproximada)</h3>
+  <pre><code>como treinar um cachorro filhote       0.996
+adestramento canino para iniciantes   0.995
+receita de bolo de cenoura            0.094
+
+atalho confere: cosine = 0.996, dot(unit,unit) = 0.996</code></pre>
+  <p>Os números exatos dependem dos vetores; a <em>ordem</em> e a ordem de grandeza é o que
+    importa. Lembre de chamar <code>main()</code> no fim. Rode com
+    <code>npx tsx pratice-05.ts</code> e me mande.</p>
+
+  <h3>Fonte primária</h3>
+  <p>
+    <a href="https://www.3blue1brown.com/lessons/dot-products">3Blue1Brown — <em>Dot products</em></a>
+    (~15 min, vídeo): a intuição geométrica de por que "componente a componente e soma" mede
+    alinhamento. Complemente com
+    <a href="https://en.wikipedia.org/wiki/Cosine_similarity">Wikipedia — Cosine similarity</a>
+    (só a seção <em>Definition</em>).
+  </p>
+
+  <div class="ask">
+    <strong>Sou seu professor — manda dúvida.</strong> Quer ver de onde vêm os embeddings de
+    verdade (chamar a API de embeddings da OpenAI/Anthropic), por que 1536 dimensões, ou o que um
+    banco vetorial (pgvector, Pinecone) faz de diferente pra não comparar contra <em>todos</em> os
+    vetores? Pergunta.
+  </div>
+
+  <div class="footer">
+    <p>
+      Anterior: <a href="0004-deep-dive-generators-abortcontroller.html">Lição 4 — generators e AbortController</a>.
+      Próxima: <strong>Lição 6 — Intuição de probabilidade</strong>: amostragem,
+      <code>temperature</code> e <code>top_p</code>.
+    </p>
+    <p>
+      Referência: <a href="../reference/vectors-cheatsheet.html">Colinha de Vetores &amp; Cosseno</a> ·
+      <a href="../reference/async-ts-cheatsheet.html">Colinha de Async TS</a> ·
+      <a href="../MISSION.md">Missão</a> · <a href="../roadmap.md">Roadmap</a> (Fase 0)
+    </p>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+  <script src="../assets/vector-lab.js"></script>
+</div>
+</body>
+</html>
