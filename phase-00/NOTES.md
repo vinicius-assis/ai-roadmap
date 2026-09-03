@@ -23,14 +23,32 @@
 3. Defensive API calls — AbortController, retry + jittered backoff, 429  ← DONE (0003), practice passed. ASYNC BLOCK COMPLETE.
 4. DEEP-DIVE (his request): generator functions (sync + async, yield both ways, yield*, pagination) + AbortController a fundo (multi-op, throwIfAborted, AbortSignal.timeout/any)  ← DONE (0004). Práticas A (pratice-03a.ts) + B (pratice-04b.ts) PASSARAM. Ver LR 0005. ASYNC/GENERATORS BLOCK COMPLETO.
 5. Vectors & dot product & cosine similarity — the embeddings math, by hand + in TS  ← CONCLUÍDA 2026-08-31. Prática: cosine-similarity.ts. Escreveu cosineSimilarity do zero; 3 bugs iniciais (norma sem quadrado, dot com + em vez de *, Math.cos extra), corrigiu os 3 sozinho após feedback conceitual. Resultado 0.9912 confere. Asset: assets/vector-lab.js. Ref: reference/vectors-cheatsheet.html.
-6. Probability intuition — sampling, temperature, top_p  ← ENTREGUE (0006), aguardando pratice-06.ts.
-   Novo asset: assets/sampling-lab.js (slider temp/top_p + bar chart). Nova ref: reference/sampling-cheatsheet.html.
-7. Capstone: tiny TS script that streams tokens from a real model API
+6. Probability intuition — sampling, temperature, top_p  ← CONCLUÍDA 2026-09-03. pratice-06.ts
+   passou, saída bate com a tabela esperada. Ver LR 0007. Bugs corrigidos sozinho após dica
+   conceitual: ordem acc/compare no sample, for-of nos logits em vez das temperaturas,
+   probs sem *100, while sem incremento. Skeleton+TODOs funcionou de novo.
+   asset: assets/sampling-lab.js. ref: reference/sampling-cheatsheet.html.
+7. Capstone: streaming de tokens do Ollama local  ← ENTREGUE 2026-09-03 (0007). Vinícius
+   instalou o Ollama; modelo qwen2.5:0.5b baixado. Skeleton: pratice-07.ts (4 TODOs).
+   Nova ref: reference/streaming-http-cheatsheet.html (NDJSON vs SSE). pratice-07.ts PASSOU
+   2026-09-03 — os 4 TODOs certos. Ver LR 0008. **FASE 0 COMPLETA.**
+   Nota: colou comentário-TODO como código (quebrou messages:); precisou de walkthrough
+   bloco-a-bloco com o código LITERAL de cada TODO — só conceitos não bastou pra montar um
+   corpo de API pela 1ª vez. Também: criado tsconfig.json (faltava; editor não achava 'process').
+   HARDWARE: máquina sem GPU. 1ª chamada carrega modelo (~30-60s) → timeout 60s. 0.5B
+   entra em loop de lista infinita → num_predict:60 é obrigatório.
 
 ## Pause point
-- 2026-08-31: Lição 6 ENTREGUE (sampling/temperature/top_p). Quando voltar: revisar
-  pratice-06.ts (softmax + sample + observar temperatura). Depois: **Lição 7 — CAPSTONE**
-  (script TS que faz streaming de tokens de uma API real; junta async + streaming + temperature).
+- 2026-09-03: **FASE 0 COMPLETA.** Lição 7 / pratice-07.ts passou. Todas as 7 lições feitas,
+  todas as práticas passaram. Entregável da MISSION.md (script que faz streaming de tokens) ✅.
+  Quando voltar: abrir a **Fase 1 (APIs de LLM / prompting)** do roadmap.md. Primeira decisão:
+  continuar no Ollama (grátis, offline, modelo fraco, NDJSON) ou pegar chave Anthropic/OpenAI
+  (paga, qualidade real, SSE — a streaming-http-cheatsheet já cobre a diferença).
+  Sugerir atualizar MISSION.md pro escopo da Fase 1 antes de começar.
+  DECIDIDO 2026-09-03: capstone usa **Ollama local** (sem chave/custo). Endpoint POST /api/generate
+  ou /api/chat → resposta NDJSON streamada (uma linha JSON por chunk; parecido com SSE da Lição 2).
+  Pré-req p/ Vinícius antes da Lição 7: instalar Ollama + `ollama pull` de um modelo pequeno
+  (llama3.2:1b ou qwen2.5:0.5b).
 
 ## Session log
 - 2026-08-30: Enunciado da prática da Lição 1 confundiu o Vinícius. Ponto de confusão:

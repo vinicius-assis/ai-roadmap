@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lição 7 · Capstone — streaming de tokens do Ollama</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next">
+    <a class="nav-btn" href="0006-probability-sampling-temperature-topp.html">← Lição 6</a>
+  </span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Lição 7 · Capstone · ~40 min</p>
+  <h1>Capstone: <span style="white-space:nowrap">streaming de tokens</span> de um modelo local</h1>
+  <p class="subtitle">Um script TS que consome um LLM real, token a token, com timeout e <code>temperature</code>. A semente da Fase 1.</p>
+
+  <div class="why">
+    Todo produto de LLM que parece "responder enquanto pensa" está fazendo uma coisa:
+    lendo um <span class="key">corpo HTTP que chega aos poucos</span> e imprimindo cada
+    pedaço na hora. Nesta lição você junta as quatro peças da Fase 0 —
+    <a href="0002-async-iterators-streaming.html"><code>for await...of</code></a>,
+    <a href="0003-defensive-api-calls.html">timeout defensivo</a>,
+    <a href="0001-async-await-mental-model.html"><code>async/await</code></a> e
+    <a href="0006-probability-sampling-temperature-topp.html"><code>temperature</code></a>
+    — num único arquivo que fala com um modelo de verdade rodando na sua máquina.
+    Na Fase 1 você troca <code>localhost</code> por uma API paga e o resto do código
+    continua igual.
+  </div>
+
+  <h2>1. O Ollama é um servidor HTTP local</h2>
+  <p>
+    Depois de <code>ollama serve</code> (ou o app aberto), existe um servidor em
+    <code>http://localhost:11434</code>. O endpoint que interessa é
+    <code>POST /api/chat</code>. O corpo da requisição:
+  </p>
+  <pre><code>{
+  "model": "qwen2.5:0.5b",
+  "messages": [{ "role": "user", "content": "explique o que é um vetor" }],
+  "stream": true,
+  "options": { "temperature": 0.8 }
+}</code></pre>
+  <p>
+    Com <code>stream: true</code> a resposta é <span class="key">NDJSON</span> — um objeto
+    JSON por linha, separados por <code>\n</code>. Cada linha:
+  </p>
+  <pre><code>{"message":{"role":"assistant","content":"Um"},"done":false}
+{"message":{"role":"assistant","content":" vetor"},"done":false}
+{"message":{"role":"assistant","content":" é"},"done":false}
+...
+{"message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}</code></pre>
+  <p>
+    O texto do token está em <code>message.content</code>. Quando <code>done</code> vira
+    <code>true</code>, acabou. É o mesmo padrão mental do SSE da
+    <a href="0002-async-iterators-streaming.html">Lição 2</a>, só que a fronteira é
+    <code>\n</code> em vez de <code>\n\n</code> e não tem o prefixo <code>data:</code>.
+    (<a href="https://github.com/ollama/ollama/blob/main/docs/api.md">docs da API do Ollama</a>)
+  </p>
+
+  <h2>2. Os bytes não chegam alinhados por linha</h2>
+  <p>
+    <code>res.body</code> é um stream de <span class="key">pedaços de bytes</span>, não de
+    linhas. Um pedaço pode terminar no meio de um JSON:
+  </p>
+  <pre><code>pedaço 1:  {"message":{"content":"Um"},"done":false}\n{"message":{"con
+pedaço 2:  tent":" vetor"},"done":false}\n</code></pre>
+  <p>
+    A técnica padrão é um <span class="key">buffer de texto</span>: acumule o que chegou,
+    corte em <code>\n</code>, processe as linhas <em>completas</em>, e <strong>guarde a
+    última fatia</strong> (que pode estar pela metade) de volta no buffer pra próxima volta.
+  </p>
+  <pre><code>let buffer = "";
+for await (const bytes of res.body) {
+  buffer += decoder.decode(bytes, { stream: true });
+  const linhas = buffer.split("\n");
+  buffer = linhas.pop() ?? "";        // ← a incompleta volta pro buffer
+  for (const linha of linhas) { /* JSON.parse(linha) */ }
+}</code></pre>
+  <div class="note">
+    <strong>Por quê <code>{ stream: true }</code> no <code>decode</code>?</strong>
+    Um caractere multibyte (acento, emoji) também pode ser cortado entre dois pedaços.
+    Essa flag faz o <code>TextDecoder</code> segurar os bytes soltos até completar.
+  </div>
+
+  <h2>3. Empacote como um async generator</h2>
+  <p>
+    Esconda os bytes, o buffer e o <code>JSON.parse</code> dentro de uma função que só
+    <code>yield</code>a <span class="key">strings de token</span> — igual ao
+    <code>stream()</code> da <a href="0002-async-iterators-streaming.html">Lição 2</a>.
+    Quem chama nem sabe que é HTTP:
+  </p>
+  <pre><code>async function* streamChat(prompt: string, opts): AsyncGenerator&lt;string&gt; { ... }
+
+for await (const token of streamChat("me conte uma piada", { temperature: 1.2 })) {
+  process.stdout.write(token);
+}</code></pre>
+  <p>
+    O <code>temperature</code> entra em <code>options</code> no corpo — é literalmente o
+    número que a <a href="0006-probability-sampling-temperature-topp.html">Lição 6</a>
+    dividia nos logits, só que agora o servidor faz a conta. E o
+    <a href="0003-defensive-api-calls.html">timeout da Lição 3</a> vira uma linha:
+    <code>signal: AbortSignal.timeout(60_000)</code>.
+  </p>
+
+  <div class="quiz" data-answer="B">
+    <p class="q">Por que guardar a última fatia do <code>split("\n")</code> de volta no buffer?</p>
+    <button data-opt="A">Porque o Ollama envia as linhas do stream em ordem invertida</button>
+    <button data-opt="B">Porque um pedaço de bytes pode terminar no meio de uma linha</button>
+    <button data-opt="C">Porque o JSON.parse exige que toda linha termine com vírgula</button>
+    <p class="explain" hidden>
+      <strong>B.</strong> O stream entrega bytes, não linhas. A última fatia depois do
+      <code>split</code> quase sempre é um JSON incompleto — processá-la agora daria
+      <code>JSON.parse</code> com erro. Ela espera o próximo pedaço completá-la.
+    </p>
+  </div>
+
+  <h2>O que você vai saber fazer ao fim</h2>
+  <ul>
+    <li>consumir um corpo HTTP streamado em TS: bytes → buffer → linhas → objetos;</li>
+    <li>explicar a fronteira NDJSON e por que o buffer é necessário;</li>
+    <li>embrulhar tudo num async generator que só entrega tokens;</li>
+    <li>passar <code>temperature</code> e um timeout numa chamada real e ver o efeito no terminal.</li>
+  </ul>
+
+  <h3>Prática (40 min) — <code>pratice-07.ts</code></h3>
+  <p>
+    <strong>Objetivo:</strong> um script que faz streaming de uma resposta do
+    <code>qwen2.5:0.5b</code> pro terminal, token a token, duas vezes — com
+    <code>temperature</code> baixa e alta — pra você ver a diferença ao vivo.
+  </p>
+  <p>Confira antes: <code>curl http://localhost:11434/api/tags</code> deve listar o modelo.
+  Se não, rode <code>ollama pull qwen2.5:0.5b</code>.</p>
+  <div class="note">
+    <strong>Duas realidades do modelo local.</strong> (1) A <em>primeira</em> chamada carrega o
+    modelo na RAM — pode levar 30–60 s numa máquina sem GPU; por isso o timeout aqui é 60 s, não
+    5 s. (2) Um modelo de 0,5 B <em>tagarela</em> e às vezes entra em loop de lista numerada
+    infinita — <code>options.num_predict</code> corta a resposta num teto de tokens. Sem ele, só
+    o timeout te salva (e é bom ver isso acontecer uma vez).
+  </div>
+
+  <pre><code>async function* streamChat(
+  prompt: string,
+  opts: { temperature?: number } = {},
+): AsyncGenerator&lt;string&gt; {
+  const res = await fetch("http://localhost:11434/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      // TODO 1: model: "qwen2.5:0.5b", messages (role user + prompt), stream: true,
+      //         options: { temperature: opts.temperature ?? 0.8, num_predict: 60 }
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`Ollama ${res.status}`);
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for await (const bytes of res.body as AsyncIterable&lt;Uint8Array&gt;) {
+    buffer += decoder.decode(bytes, { stream: true });
+    const linhas = buffer.split("\n");
+    buffer = linhas.pop() ?? "";
+    for (const linha of linhas) {
+      if (!linha.trim()) continue;
+      const obj = JSON.parse(linha);
+      // TODO 2: se obj.message?.content, yield ele
+      // TODO 3: se obj.done, return
+    }
+  }
+}
+
+async function main() {
+  const prompt = "Em uma frase, o que é uma similaridade de cosseno?";
+  for (const T of [0.2, 1.3]) {
+    console.log(`\n\n--- temperature ${T} ---`);
+    // TODO 4: for await (const token of streamChat(prompt, { temperature: T }))
+    //         → process.stdout.write(token)
+  }
+  console.log();
+}
+
+main();   // não esqueça
+</code></pre>
+
+  <p class="key" style="margin-top:1.2rem">Conceitos a segurar (não é decoreba de ordem):</p>
+  <ul>
+    <li><strong>O generator é lazy.</strong> Chamar <code>streamChat(...)</code> não dispara
+      o <code>fetch</code> — o corpo só roda quando o <code>for await</code> pede o primeiro token.</li>
+    <li><strong><code>yield</code> devolve <em>e pausa</em>.</strong> Cada token sai, a função
+      congela ali, e só descongela quando o loop pede o próximo. É o streaming.</li>
+    <li><strong><code>return</code> dentro do generator encerra o <code>for await</code>.</strong>
+      Por isso <code>obj.done</code> → <code>return</code> fecha tudo limpo.</li>
+    <li><strong><code>AbortSignal.timeout</code> aborta o <code>fetch</code> inteiro.</strong>
+      Se estourar 30 s, o <code>for await</code> lança <code>TimeoutError</code> — trate com
+      <code>try/catch</code> se quiser mensagem amigável.</li>
+  </ul>
+
+  <h3>Saída esperada (aproximada)</h3>
+  <pre><code>--- temperature 0.2 ---
+A cosseno é uma função trigonométrica que representa a relação entre o seno de
+um ângulo e a medida do ângulo. A similaridade de cosseno, em termos de sua ap
+
+--- temperature 1.3 ---
+A frase parece se referir a uma parte específica de cálculos relacionados ao
+cosseno. Nesse caso, "similaridade" no sentido de comparar direções de vetores</code></pre>
+  <p>
+    O texto sai <em>aparecendo aos poucos</em>, não de uma vez — é a prova de que o
+    streaming funciona. Cortado no meio da frase porque <code>num_predict: 60</code> limitou.
+    O modelo é minúsculo (0,5 B), então a resposta é fraca e nem sempre coerente — o que
+    importa aqui é o <strong>encanamento</strong>, não a qualidade do texto. Rode com
+    <code>npx tsx pratice-07.ts</code> e me manda.
+  </p>
+
+  <h3>Fonte primária</h3>
+  <p>
+    <a href="https://github.com/ollama/ollama/blob/main/docs/api.md">Ollama — <em>API Reference</em></a>
+    (seção <em>Generate a chat completion</em>): campos do corpo, formato NDJSON da resposta,
+    <code>options</code>. Complemente com
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web/API/Streams_API/Using_readable_streams">MDN — <em>Using readable streams</em></a>
+    pra entender o <code>res.body</code>.
+  </p>
+
+  <div class="ask">
+    <strong>Sou seu professor — manda dúvida.</strong> Quer entender por que
+    <code>res.body</code> é iterável no Node mas não no browser (lá precisa de
+    <code>getReader()</code>), como fazer retry no meio de um stream, ou como isso muda quando
+    a API é SSE (Anthropic/OpenAI) em vez de NDJSON? Pergunta.
+  </div>
+
+  <div class="footer">
+    <p>
+      Anterior: <a href="0006-probability-sampling-temperature-topp.html">Lição 6 — amostragem</a>.
+      <strong>Esta é a última lição da Fase 0.</strong> Com <code>pratice-07.ts</code> rodando,
+      você tem o entregável da <a href="../MISSION.md">Missão</a> e está pronto pra Fase 1
+      (APIs de LLM e prompting).
+    </p>
+    <p>
+      Referência: <a href="../reference/streaming-http-cheatsheet.html">Colinha de Streaming HTTP</a> ·
+      <a href="../reference/async-ts-cheatsheet.html">Colinha de Async TS</a> ·
+      <a href="../reference/sampling-cheatsheet.html">Colinha de Amostragem</a> ·
+      <a href="../MISSION.md">Missão</a>
+    </p>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+</div>
+</body>
+</html>

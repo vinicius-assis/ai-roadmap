@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Colinha · Consumindo streams HTTP em TS</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="content-nav">
+<div class="content-nav-inner">
+  <span class="content-nav-side"><a class="nav-btn is-home" href="../../index.html">&larr; Home</a></span>
+  <span class="content-nav-side next"><a class="nav-btn" href="../lessons/0007-capstone-streaming-ollama.html">Lição 7</a></span>
+</div>
+</nav>
+<div class="content">
+  <p class="eyebrow">Fase 0 · Referência</p>
+  <h1>Consumindo um corpo HTTP streamado</h1>
+  <p class="subtitle">O encanamento comum a Ollama (NDJSON) e às APIs SSE (Anthropic, OpenAI).</p>
+
+  <h2>O padrão em 4 passos</h2>
+  <table>
+    <tr><th>Passo</th><th>Código</th></tr>
+    <tr><td>1. Abrir o stream</td><td><code>const res = await fetch(url, { ..., signal: AbortSignal.timeout(30_000) })</code></td></tr>
+    <tr><td>2. Iterar os bytes</td><td><code>for await (const bytes of res.body as AsyncIterable&lt;Uint8Array&gt;)</code></td></tr>
+    <tr><td>3. Decodificar + acumular</td><td><code>buffer += decoder.decode(bytes, { stream: true })</code></td></tr>
+    <tr><td>4. Cortar na fronteira</td><td><code>const partes = buffer.split(SEP); buffer = partes.pop() ?? "";</code></td></tr>
+  </table>
+
+  <h2>Esqueleto reutilizável</h2>
+  <pre><code>async function* streamLines(
+  url: string,
+  body: unknown,
+  sep = "\n",
+): AsyncGenerator&lt;string&gt; {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for await (const bytes of res.body as AsyncIterable&lt;Uint8Array&gt;) {
+    buffer += decoder.decode(bytes, { stream: true });
+    const partes = buffer.split(sep);
+    buffer = partes.pop() ?? "";          // fatia incompleta volta pro buffer
+    for (const parte of partes) {
+      if (parte.trim()) yield parte;
+    }
+  }
+  if (buffer.trim()) yield buffer;         // resto após o último separador
+}</code></pre>
+
+  <h2>NDJSON vs SSE</h2>
+  <table>
+    <tr><th></th><th>NDJSON (Ollama)</th><th>SSE (Anthropic, OpenAI)</th></tr>
+    <tr><td>Separador</td><td><code>\n</code></td><td><code>\n\n</code> (entre eventos)</td></tr>
+    <tr><td>Formato da linha</td><td>JSON puro</td><td><code>data: {json}</code> — tire o prefixo <code>data: </code></td></tr>
+    <tr><td>Fim do stream</td><td><code>{"done": true}</code></td><td>linha <code>data: [DONE]</code> ou evento <code>message_stop</code></td></tr>
+    <tr><td>Onde está o token</td><td><code>obj.message.content</code></td><td>OpenAI: <code>obj.choices[0].delta.content</code><br>Anthropic: <code>obj.delta.text</code> em <code>content_block_delta</code></td></tr>
+    <tr><td>Content-Type</td><td><code>application/x-ndjson</code></td><td><code>text/event-stream</code></td></tr>
+  </table>
+
+  <h2>Corpo do <code>/api/chat</code> do Ollama</h2>
+  <pre><code>{
+  "model": "qwen2.5:0.5b",
+  "messages": [{ "role": "user", "content": "..." }],
+  "stream": true,                    // default já é true
+  "options": { "temperature": 0.8, "top_p": 0.9, "num_predict": 200 }
+}
+// GET /api/tags  → lista os modelos baixados
+// POST /api/pull → baixa um modelo</code></pre>
+
+  <h2>Armadilhas</h2>
+  <table>
+    <tr><th>Armadilha</th><th>Correção</th></tr>
+    <tr><td><code>JSON.parse</code> falha em ~1 a cada N linhas</td><td>Você processou a fatia incompleta — sempre <code>buffer = partes.pop()</code></td></tr>
+    <tr><td>Acento/emoji vira <code>�</code> no meio do stream</td><td><code>decoder.decode(bytes, { stream: true })</code> — a flag <code>stream</code> segura bytes soltos</td></tr>
+    <tr><td>No browser <code>res.body</code> não é <code>for await</code></td><td>Use <code>res.body.getReader()</code> + laço <code>while (!done)</code>; no Node 18+ o <code>for await</code> funciona</td></tr>
+    <tr><td>Timeout mata o stream inteiro no meio</td><td>Esperado. <code>err.name === "TimeoutError"</code> → trate; retry no meio de stream é outro problema</td></tr>
+    <tr><td>Última linha perdida quando não há <code>\n</code> final</td><td>Depois do loop, processe o que sobrou no <code>buffer</code></td></tr>
+  </table>
+
+  <div class="footer">
+    <p>
+      Usada por: <a href="../lessons/0007-capstone-streaming-ollama.html">Lição 7 — capstone: streaming do Ollama</a>.
+      Pré-requisitos: <a href="../lessons/0002-async-iterators-streaming.html">Lição 2 (for await / async generators)</a>,
+      <a href="../lessons/0003-defensive-api-calls.html">Lição 3 (timeout)</a>.
+      · <a href="../MISSION.md">Missão</a>
+    </p>
+    <p>Fonte primária: <a href="https://github.com/ollama/ollama/blob/main/docs/api.md">Ollama API Reference</a>.</p>
+  </div>
+</div>
+</body>
+</html>

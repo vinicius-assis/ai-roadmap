@@ -46,6 +46,18 @@ Trusted sources backing the Phase 0 lessons. Prefer primary/official docs.
 - **[Signal & Syntax — Temperature and Top-P: The Creativity Knobs](https://tomarcher.io/posts/temperature-top-p-creativity-knobs/)**
   — practitioner explainer, "adjust one not both". Trust: medium.
 
+## Modelo local / streaming HTTP (capstone, Lição 7)
+
+- **[Ollama — API Reference](https://github.com/ollama/ollama/blob/main/docs/api.md)**
+  — `POST /api/chat` e `/api/generate`: corpo da requisição, formato NDJSON da resposta
+  streamada (uma linha JSON por chunk, `message.content` + `done`), `options` (temperature,
+  top_p, num_predict). Porta 11434. L7 primary source. Trust: high (oficial). Verificado 2026-09-03.
+- **[MDN — Using readable streams](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Using_readable_streams)**
+  — o que é `res.body`, `getReader()` vs `for await` (Node). Trust: very high.
+- Nota de hardware (máquina do Vinícius, 2026-09-03): sem GPU. Primeira chamada carrega o
+  modelo (~30–60 s); depois de quente, `qwen2.5:0.5b` responde rápido. `num_predict` é
+  essencial — o 0.5B entra em loop de lista numerada infinita sem teto de tokens.
+
 ## Communities (wisdom)
 
 - r/LocalLLaMA and r/LLMDevs on Reddit — practitioner discussion.

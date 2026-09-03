@@ -23,10 +23,20 @@ directly after closing Lesson 5.
 - `reference/sampling-cheatsheet.html` — vocab, formulas, per-provider rules, task table,
   TS reference impl (softmax with max-subtraction, roulette sample, topP), gotchas.
 
-## Practice assigned (`pratice-06.ts`) — not yet done
-`softmax(logits, T)` (with max-subtraction for stability), `sample(probs)` (roulette),
-then loop T ∈ [0.2, 0.7, 1.0, 1.8]: print probs + 1000-draw histogram. Optional `topP`.
-Expected: distribution concentrates as T falls, spreads as T rises; counts track probs.
+## Practice (`pratice-06.ts`) — DONE 2026-09-03
+`softmax(logits, T)`, `sample(probs)` (roulette), loop T ∈ [0.2, 0.7, 1.0, 1.8]: print
+probs + 1000-draw histogram. Output matched the lesson's expected table (T=0.2 → cachorro
+94.9%/950; T=1.8 → planilha 6%/43).
+- `softmax` correct first try; skipped the `- max` stability step (optional, not needed at
+  these logit sizes). Did NOT hit Infinity/NaN.
+- Bugs he found & fixed himself across ~3 feedback rounds, each after a *conceptual* hint
+  (skeleton + concepts, no prose — per NOTES): (1) `sample` had the accumulate/compare order
+  inverted and `return 0` hardcoded; (2) `for (const T of logits)` — iterated the logits
+  array as if it were the temperature list; (3) printed `probs` as `%` without `*100`;
+  (4) `while` loop with no increment → infinite, and no `counts[s]++`.
+- Skeleton-with-TODOs format worked well again — he completed each round independently.
+- Optional `topP` not attempted.
+ASYNC + MATH BLOCKS OF PHASE 0 COMPLETE. Only the capstone (Lesson 7) remains.
 
 ## Watch for
 - The "formula that produces X vs. apply X() again" confusion from LR 0006 — here the risk
